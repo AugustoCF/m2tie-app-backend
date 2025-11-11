@@ -8,6 +8,8 @@ require('dotenv').config();
 
 // Routes
 const authRouter = require('./routes/authRoutes.js');
+const userRouter = require('./routes/userRoutes.js');
+const questionRouter = require('./routes/questionRoutes.js');
 
 // Middlewares
 
@@ -23,6 +25,8 @@ app.use(express.static('public'));
 
 // Attach routes
 app.use("/api/auth", authRouter)
+app.use("/api/user", userRouter)
+app.use("/api/question", questionRouter)
 
 // Conect to MongoDB
 mongoose.connect(
