@@ -10,6 +10,7 @@ const verifyToken = require('../helpers/check-token');
 
 // Helpers
 const getUserByToken = require('../helpers/get-user-by-token');
+const { validateQuestion, validateQuestionUpdate } = require('../helpers/validate-question-fields');
 
 // Create new Question
 router.post("/", verifyToken, async (req, res) => {
@@ -26,123 +27,16 @@ router.post("/", verifyToken, async (req, res) => {
     const options = req.body.options;
     const validation = req.body.validation;
 
-
     // Only 'admin' can create questions
     if (role !== 'admin') {
         return res.status(401).json({ error: "Acesso negado, apenas administradores podem criar questões" });
     }
 
-    // Title Validation
-    if (!title || title.trim().length === 0) {
-        return res.status(400).json({ error: "O título da questão é obrigatório" });
-    }
-
-    if (title.trim().length < 3) {
-        return res.status(400).json({ error: "O título da questão deve ter no mínimo 3 caracteres" });
-    }
-
-    if (title.trim().length > 500) {
-        return res.status(400).json({ error: "O título da questão deve ter no máximo 500 caracteres" });
-    }
-
-    // Type Validation
-    const validTypes = ['text', 'multiple_choice', 'checkbox', 'dropdown', 'scale', 'date'];
-
-    if (!type) {
-        return res.status(400).json({ error: "O tipo da questão é obrigatório" });
-    }
-
-    if (!validTypes.includes(type)) {
-        return res.status(400).json({ error: `Tipo inválido. Use: ${validTypes.join(', ')}` });
-    }
-
-    // Options Validation for types that require them
-    const typesNeedingOptions = ['multiple_choice', 'checkbox', 'dropdown', 'scale'];
-
-    if (typesNeedingOptions.includes(type)) {
-    
-        if (!options || !Array.isArray(options) || options.length === 0) {
-            return res.status(400).json({ error: `Questões do tipo "${type}" precisam ter opções` });
-        }
-
-        // Minimun number of options: 2
-        if (type !== 'scale' && options.length < 2) {
-            return res.status(400).json({ error: `Questões do tipo "${type}" precisam ter no mínimo 2 opções` });
-        }
-
-        // Validate each option structure
-        const seenValues = new Set();
-        for (let i = 0; i < options.length; i++) {
-            const option = options[i];
-
-            // Check if option has label and value
-            if (!option.label || !option.value) {
-                return res.status(400).json({ error: `Opção ${i + 1} está incompleta. Precisa de "label" e "value"` });
-            }
-
-            // Check if label is not empty
-            if (option.label.trim().length === 0) {
-                return res.status(400).json({  error: `Opção ${i + 1}: o campo "label" não pode ser vazio` });
-            }
-
-            // Check if value is not empty
-            if (option.value.trim().length === 0) {
-                return res.status(400).json({ error: `Opção ${i + 1}: o campo "value" não pode ser vazio` });
-            }
-
-            // Check for duplicate values
-            if (seenValues.has(option.value)) {
-                return res.status(400).json({ error: `Valor duplicado encontrado: "${option.value}". Cada opção deve ter um valor único` });
-            }
-
-            seenValues.add(option.value);
-        }
-
-    } else {
-        // Text and Date types should not have options
-        if (options && options.length > 0) {
-            return res.status(400).json({ error: `Questões do tipo "${type}" não devem ter opções` });
-        }
-    }
-
-    // Validation Object Validation
-    if (validation) {
-
-        // text type specific validations
-        if (type !== 'text') {
-            if (validation.minLength || validation.maxLength || validation.pattern) {
-                return res.status(400).json({ error: "minLength, maxLength e pattern só são válidos para questões do tipo 'text'" });
-            }
-        } else {
-
-            // minLength Validation
-            if (validation.minLength !== undefined && validation.minLength !== null) {
-                if (typeof validation.minLength !== 'number' || validation.minLength < 0) {
-                    return res.status(400).json({ error: "minLength deve ser um número maior ou igual a 0" });
-                }
-            }
-
-            // maxLength Validation
-            if (validation.maxLength !== undefined && validation.maxLength !== null) {
-                if (typeof validation.maxLength !== 'number' || validation.maxLength <= 0) {
-                    return res.status(400).json({ error: "maxLength deve ser um número maior que 0" });
-                }
-
-                // maxLength has to be greater than minLength
-                if (validation.minLength && validation.maxLength <= validation.minLength) {
-                    return res.status(400).json({ error: "maxLength deve ser maior que minLength" });
-                }
-            }
-
-            // Regex Pattern Validation
-            if (validation.pattern) {
-                try {
-                    new RegExp(validation.pattern);
-                } catch (error) {
-                    return res.status(400).json({ error: "pattern inválido. Deve ser uma expressão regular válida" });
-                }
-            }
-        }
+    // Validate question fields
+    const validationResult = validateQuestion({ title, type, options, validation });
+        
+    if (!validationResult.isValid) {
+        return res.status(400).json({ error: validationResult.error });
     }
 
     // Verify user
@@ -177,6 +71,177 @@ router.post("/", verifyToken, async (req, res) => {
     } catch (error) {
         return res.status(400).json({ error: "Acesso Negado" });
     } 
+});
+
+// Get all Questions for staff and admin
+router.get("/all", verifyToken, async (req, res) => {
+    try {
+
+        const token = req.header("auth-token");
+        const userByToken = await getUserByToken(token);
+        const userId = userByToken._id.toString();
+
+        // Verify user
+        const user = await User.findOne({ _id: userId });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        if (user.role !== 'admin' && user.role !== 'staff') {
+            return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar as questões" });
+        }
+        
+        const questions = await Question.find().sort({ createdAt: -1 });
+        return res.status(200).json({ error: null, data: questions });
+
+    } catch (error) {
+        return res.status(500).json({ error });
+    }
+});
+
+// Get Question by ID
+router.get("/:id", verifyToken, async (req, res) => {
+
+    try {
+
+        const token = req.header("auth-token");
+        const userByToken = await getUserByToken(token);
+        const userId = userByToken._id.toString();
+
+        // Verify user
+        const user = await User.findOne({ _id: userId });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        if (user.role !== 'admin' && user.role !== 'staff') {
+            return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar as questões" });
+        }
+
+        const questionId = req.params.id;
+
+        const question = await Question.findById(questionId);
+
+        if (!question) {
+            return res.status(404).json({ error: "Questão não encontrada" });
+        }
+
+        return res.status(200).json({ error: null, data: question });
+
+    } catch (error) {
+        return res.status(500).json({ error });
+    }
+
+});
+
+// Delete Question
+router.delete("/:id", verifyToken, async (req, res) => {
+    
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const questionId = req.params.id;
+    const userId = userByToken._id.toString();
+
+    try {
+        // Verify user
+        const user = await User.findOne({ _id: userId });
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        if (user.role !== 'admin') {
+            return res.status(401).json({ error: "Acesso negado, apenas administradores podem deletar questões" });
+        }
+
+        // Verify if question exists and delete
+        const deletedQuestion = await Question.findByIdAndDelete(questionId);
+
+        if (!deletedQuestion) {
+            return res.status(404).json({ error: "Questão não encontrada" });
+        }
+
+        return res.status(200).json({ msg: "Questão deletada com sucesso" });
+
+    } catch (error) {
+        return res.status(400).json({ error });
+    }
+});
+
+// Update Question
+router.put("/:id", verifyToken, async (req, res) => {
+
+    // Req Body
+    const title = req.body.title;
+    const type = req.body.type;
+    const options = req.body.options;
+    const validation = req.body.validation;
+    const questionId = req.params.id;
+
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    // Verify user
+    try {
+
+        const user = await User.findOne({ _id: userId });
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+        if (user.role !== 'admin') {
+            return res.status(401).json({ error: "Acesso negado, apenas administradores podem atualizar questões" });
+        }
+
+        // Find question
+        const question = await Question.findOne({ _id: questionId });
+        if (!question) {
+            return res.status(404).json({ error: "Questão não encontrada" });
+        }
+
+        // Validate and update fields
+        const validationResult = validateQuestionUpdate({ title, type, options, validation }, question);
+        
+        if (!validationResult.isValid) {
+            return res.status(400).json({ error: validationResult.error });
+        }
+
+        // Build question object
+        const newQuestion = {};
+
+        if (title !== undefined) {
+            newQuestion.title = title.trim();
+        }
+
+        if (type !== undefined) {
+            newQuestion.type = type;
+        }
+
+        if (options !== undefined) {
+            newQuestion.options = options.map(opt => ({
+                label: opt.label.trim(),
+                value: opt.value.trim()
+            }));
+        }
+
+        if (validation !== undefined) {
+            newQuestion.validation = validation;
+        }
+
+        try {
+
+            const updatedQuestion = await Question.findOneAndUpdate({ _id: questionId }, { $set: newQuestion }, { new: true });
+            return res.status(200).json({ error: null, msg: "Questão atualizada com sucesso", data: updatedQuestion });
+
+        } catch (error) {
+            return res.status(500).json({ error: "Erro ao atualizar a questão" });
+        }
+
+    } catch (error) {
+        return res.status(400).json({ error: "Acesso Negado" });
+    }
 });
 
 module.exports = router;
