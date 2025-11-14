@@ -2,7 +2,7 @@
 
 > API RESTful para gerenciamento de formulários dinâmicos com autenticação JWT e MongoDB.
 
-[![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-24.x-green.svg)](https://nodejs.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-8.x-green.svg)](https://www.mongodb.com/)
 [![License](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
 
@@ -11,7 +11,7 @@
 ## 🚀 Início Rápido
 
 ### Pré-requisitos
-- Node.js >= 18.0.0
+- Node.js == 24.11.1
 - MongoDB >= 4.4
 
 ### Instalação
