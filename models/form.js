@@ -17,12 +17,6 @@ const formSchema = new mongoose.Schema({
         required: { 
             type: Boolean, 
             default: false 
-        },
-
-        snapshot: {
-            title: String,
-            type: String,
-            options: []
         }
     }],
     isActive: {

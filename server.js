@@ -14,9 +14,7 @@ const questionRouter = require('./routes/questionRoutes.js');
 // Middlewares
 
 // Configurations
-const dbName = process.env.DB_NAME;
 const port = process.env.PORT;
-
 const app = express();
 
 app.use(cors());
@@ -29,9 +27,26 @@ app.use("/api/user", userRouter)
 app.use("/api/question", questionRouter)
 
 // Conect to MongoDB
-mongoose.connect(
-    `mongodb://localhost/${dbName}`
-);
+const DB_USER = process.env.DB_USER;
+const DB_PASSWORD = process.env.DB_PASSWORD;
+const DB_NAME = process.env.DB_NAME;
+
+const mongoURI = `mongodb+srv://${DB_USER}:${DB_PASSWORD}@cluster0.7icwgkf.mongodb.net/${DB_NAME}`;
+
+async function connectDB() {
+    try {
+        await mongoose.connect(mongoURI, {
+            retryWrites: true,
+            w: 'majority'
+        });
+        console.log('Conectado ao MongoDB Atlas');
+    } catch (error) {
+        console.error('ERRO ao conectar ao MongoDB:');
+        
+        process.exit(1);
+    }
+}
+connectDB();
 
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
