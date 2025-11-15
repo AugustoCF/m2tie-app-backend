@@ -1,5 +1,4 @@
 const router = require('express').Router();
-const jwt = require('jsonwebtoken');
 
 // Models
 const Question = require('../models/question');
@@ -62,7 +61,7 @@ router.post("/", verifyToken, async (req, res) => {
         try {
 
             const newQuestion = await question.save();
-            return res.status(201).json({ msg: "Questão criada com sucesso", data: newQuestion });
+            return res.status(201).json({error: null, msg: "Questão criada com sucesso", data: newQuestion });
 
         } catch (error) {
             return res.status(500).json({ error: "Erro ao criar a questão" });
@@ -93,7 +92,7 @@ router.get("/all", verifyToken, async (req, res) => {
         }
         
         const questions = await Question.find().sort({ createdAt: -1 });
-        return res.status(200).json({ error: null, data: questions });
+        return res.status(200).json({ error: null, msg: "Questões encontradas com sucesso", data: questions });
 
     } catch (error) {
         return res.status(500).json({ error });
@@ -128,7 +127,7 @@ router.get("/:id", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Questão não encontrada" });
         }
 
-        return res.status(200).json({ error: null, data: question });
+        return res.status(200).json({ error: null, msg: "Questão encontrada com sucesso", data: question });
 
     } catch (error) {
         return res.status(500).json({ error });
@@ -162,7 +161,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Questão não encontrada" });
         }
 
-        return res.status(200).json({ msg: "Questão deletada com sucesso" });
+        return res.status(200).json({error: null, msg: "Questão deletada com sucesso" });
 
     } catch (error) {
         return res.status(400).json({ error });
@@ -229,6 +228,8 @@ router.put("/:id", verifyToken, async (req, res) => {
         if (validation !== undefined) {
             newQuestion.validation = validation;
         }
+
+        newQuestion.createdBy = user._id.toString();
 
         try {
 

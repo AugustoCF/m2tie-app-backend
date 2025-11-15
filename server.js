@@ -10,6 +10,7 @@ require('dotenv').config();
 const authRouter = require('./routes/authRoutes.js');
 const userRouter = require('./routes/userRoutes.js');
 const questionRouter = require('./routes/questionRoutes.js');
+const formRouter = require('./routes/formRoutes.js');
 
 // Middlewares
 
@@ -25,6 +26,7 @@ app.use(express.static('public'));
 app.use("/api/auth", authRouter)
 app.use("/api/user", userRouter)
 app.use("/api/question", questionRouter)
+app.use("/api/form", formRouter)
 
 // Conect to MongoDB
 const DB_USER = process.env.DB_USER;

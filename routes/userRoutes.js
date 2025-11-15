@@ -18,7 +18,7 @@ router.get("/:id", verifyToken, async (req, res) => {
         // Verify if user exists
         const user = await User.findOne({ _id: id }, {  password: 0 });
 
-        res.json({ error: null, user });
+        res.json({ error: null, msg: "Usuário encontrado com sucesso", data: user });
 
     } catch (error) {
         return res.status(404).json({ error: "Usuário não encontrado" });
@@ -85,6 +85,38 @@ router.put("/", verifyToken, async (req, res) => {
         return res.status(400).json({ error });
     }
 
+});
+
+// Delete an user by ID
+router.delete("/:id", verifyToken, async (req, res) => {
+    const id = req.params.id;
+    const token = req.header("auth-token");
+    const user = await getUserByToken(token);
+    const userId = user._id.toString();
+
+    try {
+
+        // Check ADMIN role
+        const user = await User.findOne({ _id: userId });
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+        if (user.role !== 'admin') {
+            return res.status(401).json({ error: "Acesso negado" });
+        }
+
+        // Verify if the user exists and delete
+        const deletedUser = await User.findByIdAndDelete(id);
+
+        if (!deletedUser) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        return res.status(200).json({ error: null, msg: "Usuário deletado com sucesso" });
+
+    } catch (error) {
+        return res.status(400).json({ error });
+    }
 });
 
 module.exports = router;
