@@ -133,7 +133,6 @@ router.get("/all", verifyToken, async (req, res) => {
     const token = req.header("auth-token");
     const userByToken = await getUserByToken(token);
     const userId = userByToken._id.toString();
-    const role = userByToken.role;
 
     // Check user in Db
     try {
@@ -143,15 +142,67 @@ router.get("/all", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
+        const role = user.role;
+
         // Only 'admin' and 'staff' can access all responses
         if (role !== 'admin' && role !== 'staff') {
             return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar todas as respostas" });
         }
 
-        
+        const responses = await Response.find()
+            .sort({ submittedAt: -1 })
+            .populate('formId', 'title description')
+            .populate('userId', 'name email')
+            .populate('answers.questionId', 'title type options');
+
+        return res.status(200).json({ error: null, msg: "Respostas encontradas com sucesso", data: responses });
+
         
     } catch (error) {
         return res.status(500).json({ error });
     }
 });
+
+// Get response by ID (admin/staff only)
+router.get("/:id", verifyToken, async (req, res) => {
+
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    // Request data
+    const responseId = req.params.id;
+
+    // Check user in Db
+    try {
+        const user = await User.findOne({ _id: userId });
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+        const role = user.role;
+
+        // Only 'admin' and 'staff' can access response by ID
+        if (role !== 'admin' && role !== 'staff') {
+            return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar respostas específicas" });
+        }
+
+        // Find response by ID
+        const response = await Response.findOne({ _id: responseId })
+            .populate('formId', 'title description')
+            .populate('userId', 'name email')
+            .populate('answers.questionId', 'title type options');
+
+        if (!response) {
+            return res.status(404).json({ error: "Resposta não encontrada" });
+        }
+
+        return res.status(200).json({ error: null, msg: "Resposta encontrada com sucesso", data: response });
+
+    } catch (error) {
+        return res.status(500).json({ error });
+    }
+});
+
+
 module.exports = router;
