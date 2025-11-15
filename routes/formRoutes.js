@@ -118,6 +118,34 @@ router.get("/all", verifyToken, async (req, res) => {
     }
 });
 
+// Get Active Form
+router.get("/active", verifyToken, async (req, res) => {
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    try {
+        const user = await User.findOne({ _id: userId });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        const form = await Form.findOne({ isActive: true })
+            .populate('questions.questionId')
+            .populate('createdBy', 'name email role');
+
+        if (!form) {
+            return res.status(404).json({ error: "Formulário ativo não encontrado" });
+        }
+
+        return res.status(200).json({ error: null, msg: "Formulário ativo encontrado com sucesso", data: form });
+
+    } catch (error) {
+        return res.status(500).json({ error });
+    }
+});
+
 // Get a Form by ID
 router.get("/:id", verifyToken, async (req, res) => {
     const formId = req.params.id;
