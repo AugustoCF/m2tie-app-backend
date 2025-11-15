@@ -141,10 +141,19 @@ router.get("/active", verifyToken, async (req, res) => {
         }
 
         // Check if the user has already responded to this form
-        const existingResponse = await Response.findOne({ formId: form._id, userId: userId });
+        const existingResponse = await Response.findOne({ formId: form._id, userId: userId })
+            .populate('formId', 'title description');
 
         if (existingResponse) {
-            return res.status(200).json({ error: null, msg: "Formulário já respondido", data: null });
+            return res.status(200).json({ 
+                error: null, 
+                msg: "Formulário já respondido", 
+                data: {
+                    formTitle: existingResponse.formId.title,
+                    submittedAt: existingResponse.submittedAt,
+                    responseId: existingResponse._id
+                }
+            });
         }
 
         return res.status(200).json({ error: null, msg: "Formulário ativo encontrado com sucesso", data: form });
