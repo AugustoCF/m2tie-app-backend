@@ -204,5 +204,45 @@ router.get("/:id", verifyToken, async (req, res) => {
     }
 });
 
+// Delete a response by ID (admin only)
+router.delete("/:id", verifyToken, async (req, res) => {
+
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    // Request data
+    const responseId = req.params.id;
+
+    try {
+
+        // Verify user
+        const user = await User.findOne({ _id: userId });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        const role = user.role;
+
+        // Only 'admin' can delete responses
+        if (role !== 'admin') {
+            return res.status(401).json({ error: "Acesso negado, apenas administradores podem deletar respostas" });
+        }
+
+        // Delete response by ID
+        const deletedResponse = await Response.findByIdAndDelete(responseId);
+
+        if (!deletedResponse) {
+            return res.status(404).json({ error: "Resposta não encontrada" });
+        }
+
+        return res.status(200).json({ error: null, msg: "Resposta deletada com sucesso" });
+
+    } catch (error) {
+        return res.status(500).json({ error });
+    }
+});
 
 module.exports = router;
