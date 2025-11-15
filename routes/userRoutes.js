@@ -9,6 +9,35 @@ const verifyToken = require('../helpers/check-token');
 // Helpers
 const getUserByToken = require('../helpers/get-user-by-token');
 
+// Get all users
+router.get("/all", verifyToken, async (req, res) => {
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    try {
+
+        // Verify ADMIN role
+        const user = await User.findOne({ _id: userId });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+        if (user.role !== 'admin') {
+            return res.status(401).json({ error: "Acesso negado" });
+        }
+
+        // Get all users
+        const users = await User.find({}, {  password: 0 });
+
+        res.json({ error: null, msg: "Usuários encontrados com sucesso", data: users });
+        
+    } catch (error) {
+        return res.status(500).json({ error: "Erro ao buscar usuários" });
+    }
+});
+
 // Get an user
 router.get("/:id", verifyToken, async (req, res) => {
 

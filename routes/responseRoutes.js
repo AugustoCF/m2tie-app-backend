@@ -127,4 +127,31 @@ router.post("/", verifyToken, async (req, res) => {
     }
 });
 
+// Get all responses (admin/staff only)
+router.get("/all", verifyToken, async (req, res) => {
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+    const role = userByToken.role;
+
+    // Check user in Db
+    try {
+        const user = await User.findOne({ _id: userId });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        // Only 'admin' and 'staff' can access all responses
+        if (role !== 'admin' && role !== 'staff') {
+            return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar todas as respostas" });
+        }
+
+        
+        
+    } catch (error) {
+        return res.status(500).json({ error });
+    }
+});
 module.exports = router;
