@@ -91,7 +91,10 @@ router.get("/all", verifyToken, async (req, res) => {
             return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar as questões" });
         }
         
-        const questions = await Question.find().sort({ createdAt: -1 });
+        const questions = await Question.find()
+            .sort({ createdAt: -1 })
+            .populate('createdBy', 'name email role');
+
         return res.status(200).json({ error: null, msg: "Questões encontradas com sucesso", data: questions });
 
     } catch (error) {
@@ -121,7 +124,8 @@ router.get("/:id", verifyToken, async (req, res) => {
 
         const questionId = req.params.id;
 
-        const question = await Question.findById(questionId);
+        const question = await Question.findById(questionId)
+            .populate('createdBy', 'name email role');
 
         if (!question) {
             return res.status(404).json({ error: "Questão não encontrada" });

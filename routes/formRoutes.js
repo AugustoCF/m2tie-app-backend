@@ -106,7 +106,10 @@ router.get("/all", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
-        const forms = await Form.find().sort({ createdAt: -1 }).populate('questions.questionId');
+        const forms = await Form.find()
+            .sort({ createdAt: -1 })
+            .populate('questions.questionId')
+            .populate('createdBy', 'name email role');
 
         return res.status(200).json({ error: null, msg: "Formulários encontrados com sucesso", data: forms });
 
@@ -130,7 +133,9 @@ router.get("/:id", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
-        const form = await Form.findOne({ _id: formId }).populate('questions.questionId');
+        const form = await Form.findOne({ _id: formId })
+            .populate('questions.questionId')
+            .populate('createdBy', 'name email role');
 
         if (!form) {
             return res.status(404).json({ error: "Formulário não encontrado" });

@@ -11,6 +11,7 @@ const authRouter = require('./routes/authRoutes.js');
 const userRouter = require('./routes/userRoutes.js');
 const questionRouter = require('./routes/questionRoutes.js');
 const formRouter = require('./routes/formRoutes.js');
+const responseRouter = require('./routes/responseRoutes.js');
 
 // Middlewares
 
@@ -23,10 +24,11 @@ app.use(express.json());
 app.use(express.static('public'));
 
 // Attach routes
-app.use("/api/auth", authRouter)
-app.use("/api/user", userRouter)
-app.use("/api/question", questionRouter)
-app.use("/api/form", formRouter)
+app.use("/api/auth", authRouter);
+app.use("/api/user", userRouter);
+app.use("/api/question", questionRouter);
+app.use("/api/form", formRouter);
+app.use("/api/response", responseRouter);
 
 // Conect to MongoDB
 const DB_USER = process.env.DB_USER;
