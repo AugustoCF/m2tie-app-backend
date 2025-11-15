@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 const Form = require('../models/form');
 const Question = require('../models/question');
 const User = require('../models/user');
+const Response = require('../models/response');
 
 // Middlewares
 const verifyToken = require('../helpers/check-token');
@@ -137,6 +138,13 @@ router.get("/active", verifyToken, async (req, res) => {
 
         if (!form) {
             return res.status(404).json({ error: "Formulário ativo não encontrado" });
+        }
+
+        // Check if the user has already responded to this form
+        const existingResponse = await Response.findOne({ formId: form._id, userId: userId });
+
+        if (existingResponse) {
+            return res.status(200).json({ error: null, msg: "Formulário já respondido", data: null });
         }
 
         return res.status(200).json({ error: null, msg: "Formulário ativo encontrado com sucesso", data: form });
