@@ -25,10 +25,10 @@ app.use(express.static('public'));
 
 // Attach routes
 app.use("/api/auth", authRouter);
-app.use("/api/user", userRouter);
-app.use("/api/question", questionRouter);
-app.use("/api/form", formRouter);
-app.use("/api/response", responseRouter);
+app.use("/api/users", userRouter);
+app.use("/api/questions", questionRouter);
+app.use("/api/forms", formRouter);
+app.use("/api/responses", responseRouter);
 
 // Conect to MongoDB
 const DB_USER = process.env.DB_USER;
