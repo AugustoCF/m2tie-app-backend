@@ -378,6 +378,170 @@ router.get("/all", verifyToken, async (req, res) => {
 
 /**
  * @swagger
+ * /api/forms/{id}/respondents:
+ *   get:
+ *     summary: Listar usuários que responderam o formulário
+ *     description: Retorna todos os usuários que já submeteram respostas para este formulário (apenas admin e staff)
+ *     tags: [Formulários]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do formulário
+ *         example: "507f1f77bcf86cd799439013"
+ *     responses:
+ *       200:
+ *         description: Respondentes encontrados com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Respondentes encontrados com sucesso"
+ *                 formTitle:
+ *                   type: string
+ *                   example: "Pesquisa de Satisfação"
+ *                 formDescription:
+ *                   type: string
+ *                   example: "Avalie nosso serviço"
+ *                 totalRespondents:
+ *                   type: number
+ *                   example: 15
+ *                 respondents:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                         example: "507f1f77bcf86cd799439011"
+ *                       name:
+ *                         type: string
+ *                         example: "João Silva"
+ *                       email:
+ *                         type: string
+ *                         example: "joao@email.com"
+ *                       role:
+ *                         type: string
+ *                         enum: [user, admin, staff]
+ *                         example: "user"
+ *                       submittedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         example: "2025-11-16T14:30:00.000Z"
+ *                       responseId:
+ *                         type: string
+ *                         example: "507f1f77bcf86cd799439015"
+ *       401:
+ *         description: Acesso negado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Acesso negado, apenas administradores e equipe podem acessar esta informação"
+ *       404:
+ *         description: Formulário ou usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               usuarioNaoEncontrado:
+ *                 value:
+ *                   error: "Usuário não encontrado"
+ *               formularioNaoEncontrado:
+ *                 value:
+ *                   error: "Formulário não encontrado"
+ *       500:
+ *         description: Erro interno do servidor
+ */
+// Get respondents of a Form
+router.get("/:formId/respondents", verifyToken, async (req, res) => {
+
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    // Request data
+    const formId = req.params.formId;
+
+    try {
+        // Verify user
+        const user = await User.findOne({ _id: userId });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        // Only admin and staff can access
+        if (user.role !== 'admin' && user.role !== 'staff') {
+            return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar esta informação" });
+        }
+
+        // Verify if form exists
+        const form = await Form.findOne({ _id: formId });
+
+        if (!form) {
+            return res.status(404).json({ error: "Formulário não encontrado" });
+        }
+
+        // Get all responses for this form
+        const responses = await Response.find({ formId: formId })
+            .populate('userId', 'name email role')
+            .sort({ submittedAt: -1 });
+
+        // Extract users with response details
+        const respondents = responses.map(response => {
+            if (response.userId) {
+                return {
+                    _id: response.userId._id,
+                    name: response.userId.name,
+                    email: response.userId.email,
+                    role: response.userId.role,
+                    submittedAt: response.submittedAt,
+                    responseId: response._id
+                };
+            } else {
+                // Handle deleted users
+                return {
+                    _id: null,
+                    name: "Usuário Deletado",
+                    email: "N/A",
+                    role: "N/A",
+                    submittedAt: response.submittedAt,
+                    responseId: response._id
+                };
+            }
+        });
+
+        return res.status(200).json({
+            error: null,
+            msg: "Respondentes encontrados com sucesso",
+            formTitle: form.title,
+            formDescription: form.description,
+            totalRespondents: respondents.length,
+            respondents: respondents
+        });
+
+    } catch (error) {
+        return res.status(500).json({ error: "Erro ao buscar respondentes" });
+    }
+});
+
+/**
+ * @swagger
  * /api/responses/{id}:
  *   get:
  *     summary: Obter resposta por ID
