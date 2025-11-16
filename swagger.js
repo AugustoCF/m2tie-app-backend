@@ -61,52 +61,6 @@ const swaggerOptions = {
                         }
                     }
                 },
-                UserRegister: {
-                    type: 'object',
-                    required: ['name', 'email', 'password', 'confirmpassword', 'role'],
-                    properties: {
-                        name: {
-                            type: 'string',
-                            example: 'João Silva'
-                        },
-                        email: {
-                            type: 'string',
-                            format: 'email',
-                            example: 'joao@email.com'
-                        },
-                        password: {
-                            type: 'string',
-                            format: 'password',
-                            example: 'senha123'
-                        },
-                        confirmpassword: {
-                            type: 'string',
-                            format: 'password',
-                            example: 'senha123'
-                        },
-                        role: {
-                            type: 'string',
-                            enum: ['admin', 'staff', 'user'],
-                            example: 'user'
-                        }
-                    }
-                },
-                UserLogin: {
-                    type: 'object',
-                    required: ['email', 'password'],
-                    properties: {
-                        email: {
-                            type: 'string',
-                            format: 'email',
-                            example: 'joao@email.com'
-                        },
-                        password: {
-                            type: 'string',
-                            format: 'password',
-                            example: 'senha123'
-                        }
-                    }
-                },
                 Question: {
                     type: 'object',
                     required: ['title', 'type', 'createdBy'],
@@ -176,40 +130,6 @@ const swaggerOptions = {
                         }
                     }
                 },
-                QuestionCreate: {
-                    type: 'object',
-                    required: ['title', 'type'],
-                    properties: {
-                        title: {
-                            type: 'string',
-                            example: 'Qual o seu nome?'
-                        },
-                        type: {
-                            type: 'string',
-                            enum: ['text', 'multiple_choice', 'checkbox', 'dropdown', 'scale', 'date'],
-                            example: 'text'
-                        },
-                        options: {
-                            type: 'array',
-                            items: {
-                                type: 'object',
-                                properties: {
-                                    label: { type: 'string' },
-                                    value: { type: 'string' }
-                                }
-                            }
-                        },
-                        validation: {
-                            type: 'object',
-                            properties: {
-                                required: { type: 'boolean' },
-                                minLength: { type: 'number' },
-                                maxLength: { type: 'number' },
-                                pattern: { type: 'string' }
-                            }
-                        }
-                    }
-                },
                 Form: {
                     type: 'object',
                     required: ['title', 'questions', 'createdBy'],
@@ -263,35 +183,6 @@ const swaggerOptions = {
                         }
                     }
                 },
-                FormCreate: {
-                    type: 'object',
-                    required: ['title', 'questions'],
-                    properties: {
-                        title: {
-                            type: 'string',
-                            example: 'Pesquisa de Satisfação'
-                        },
-                        description: {
-                            type: 'string',
-                            example: 'Avalie nosso serviço'
-                        },
-                        questions: {
-                            type: 'array',
-                            items: {
-                                type: 'object',
-                                properties: {
-                                    questionId: { type: 'string' },
-                                    order: { type: 'number' },
-                                    required: { type: 'boolean' }
-                                }
-                            }
-                        },
-                        isActive: {
-                            type: 'boolean',
-                            default: true
-                        }
-                    }
-                },
                 Response: {
                     type: 'object',
                     required: ['formId', 'userId', 'answers'],
@@ -335,31 +226,6 @@ const swaggerOptions = {
                             type: 'string',
                             format: 'date-time',
                             example: '2025-11-16T10:30:00.000Z'
-                        }
-                    }
-                },
-                ResponseCreate: {
-                    type: 'object',
-                    required: ['formId', 'answers'],
-                    properties: {
-                        formId: {
-                            type: 'string',
-                            example: '507f1f77bcf86cd799439013'
-                        },
-                        answers: {
-                            type: 'array',
-                            items: {
-                                type: 'object',
-                                properties: {
-                                    questionId: { type: 'string' },
-                                    answer: { 
-                                        oneOf: [
-                                            { type: 'string' },
-                                            { type: 'array' }
-                                        ]
-                                    }
-                                }
-                            }
                         }
                     }
                 },

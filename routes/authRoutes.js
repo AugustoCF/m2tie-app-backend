@@ -91,6 +91,12 @@ router.post("/register", async (req, res) => {
         return res.status(400).json({ error: "Por favor preencha todos os campos obrigatórios" });
     }
 
+    // Check email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Formato de e-mail inválido" });
+    }
+
     // Check if passwords match
     if (password !== confirmpassword) {
         return res.status(400).json({ error: "As senhas não coincidem" });
@@ -212,35 +218,44 @@ router.post("/login", async (req, res) => {
         return res.status(400).json({ error: "Por favor preencha todos os campos obrigatórios" });
     }
 
-    // Check if user exists
-    const user = await User.findOne({ email: email });
-
-    if (!user) {
-        return res.status(400).json({ error: "Não há um usuário cadastrado com este e-mail" });
+    // Check email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        return res.status(400).json({ error: "Formato de e-mail inválido" });
     }
 
-    // Check if password matches
-    const checkPassword = await bcrypt.compare(password, user.password);
+    try {
 
-    if (!checkPassword) {
-        return res.status(400).json({ error: "Senha inválida" });
+        // Check if user exists
+        const user = await User.findOne({ email: email });
+
+        if (!user) {
+            return res.status(400).json({ error: "Não há um usuário cadastrado com este e-mail" });
+        }
+
+        // Check if password matches
+        const checkPassword = await bcrypt.compare(password, user.password);
+
+        if (!checkPassword) {
+            return res.status(400).json({ error: "Senha inválida" });
+        }
+
+        // Create user token
+        const token = jwt.sign(
+            {
+                name: user.name,
+                userId: user._id,
+                role: user.role
+            },
+            process.env.JWT_SECRET 
+        );
+
+        // Return token
+        res.json({ error: null, msg: "Você está autenticado", token: token, userId: user._id });
+
+    } catch (error) {
+        return res.status(500).json({ error }); 
     }
-
-    // Create user token
-    const token = jwt.sign(
-        {
-            name: user.name,
-            userId: user._id,
-            role: user.role
-        },
-        process.env.JWT_SECRET // melhorar essa parte depoisx
-    );
-
-    // Return token
-    res.json({ error: null, msg: "Você está autenticado", token: token, userId: user._id });
-
-
-
 });
 
 
