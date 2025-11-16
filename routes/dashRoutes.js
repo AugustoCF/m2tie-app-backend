@@ -727,7 +727,10 @@ router.get("/:formId", verifyToken, async (req, res) => {
 
         // Get responses
         const totalResponses = await Response.countDocuments({ formId });
-        const responses = await Response.find({ formId }).populate('userId', 'name email');
+        const responses = await Response.find({ formId })
+            .populate('userId', 'name email')
+            .populate('answers.questionId', 'title type options');
+
 
         return res.status(200).json({ 
             error: null, 
