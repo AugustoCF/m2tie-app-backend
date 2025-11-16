@@ -9,6 +9,53 @@ const verifyToken = require('../helpers/check-token');
 // Helpers
 const getUserByToken = require('../helpers/get-user-by-token');
 
+/**
+ * @swagger
+ * /api/users/all:
+ *   get:
+ *     summary: Listar todos os usuários
+ *     description: Retorna todos os usuários cadastrados no sistema (apenas admin)
+ *     tags: [Usuários]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Usuários encontrados com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Usuários encontrados com sucesso"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Acesso negado - apenas admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Acesso negado"
+ *       404:
+ *         description: Usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Usuário não encontrado"
+ *       500:
+ *         description: Erro ao buscar usuários
+ */
 // Get all users
 router.get("/all", verifyToken, async (req, res) => {
     // Token data
@@ -38,6 +85,49 @@ router.get("/all", verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     summary: Obter usuário por ID
+ *     description: Retorna informações de um usuário específico (sem senha)
+ *     tags: [Usuários]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do usuário
+ *         example: "507f1f77bcf86cd799439011"
+ *     responses:
+ *       200:
+ *         description: Usuário encontrado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Usuário encontrado com sucesso"
+ *                 data:
+ *                   $ref: '#/components/schemas/User'
+ *       404:
+ *         description: Usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Usuário não encontrado"
+ */
 // Get an user
 router.get("/:id", verifyToken, async (req, res) => {
 
@@ -54,6 +144,127 @@ router.get("/:id", verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   put:
+ *     summary: Atualizar usuário
+ *     description: Atualiza dados de um usuário. Usuários podem editar seus próprios dados, admin pode editar qualquer usuário e alterar roles.
+ *     tags: [Usuários]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do usuário a ser atualizado
+ *         example: "507f1f77bcf86cd799439011"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 example: "João Silva Atualizado"
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: "joao.novo@email.com"
+ *               password:
+ *                 type: string
+ *                 format: password
+ *                 example: "novaSenha123"
+ *               confirmPassword:
+ *                 type: string
+ *                 format: password
+ *                 example: "novaSenha123"
+ *               role:
+ *                 type: string
+ *                 enum: [user, admin, staff]
+ *                 example: "staff"
+ *                 description: "Apenas admin pode alterar role"
+ *           examples:
+ *             atualizarNome:
+ *               summary: Atualizar apenas nome
+ *               value:
+ *                 name: "João Silva Atualizado"
+ *             atualizarSenha:
+ *               summary: Atualizar senha
+ *               value:
+ *                 password: "novaSenha123"
+ *                 confirmPassword: "novaSenha123"
+ *             atualizarRole:
+ *               summary: Atualizar role (apenas admin)
+ *               value:
+ *                 role: "staff"
+ *             atualizarCompleto:
+ *               summary: Atualização completa
+ *               value:
+ *                 name: "João Silva"
+ *                 email: "joao.novo@email.com"
+ *                 password: "novaSenha123"
+ *                 confirmPassword: "novaSenha123"
+ *                 role: "staff"
+ *     responses:
+ *       200:
+ *         description: Usuário atualizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Usuário atualizado com sucesso"
+ *                 data:
+ *                   $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Erro de validação
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               emailJaCadastrado:
+ *                 value:
+ *                   error: "Email já cadastrado"
+ *               senhasNaoCoincidem:
+ *                 value:
+ *                   error: "As senhas não coincidem"
+ *               funcaoInvalida:
+ *                 value:
+ *                   error: "Função inválida."
+ *       401:
+ *         description: Acesso negado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               acessoNegado:
+ *                 value:
+ *                   error: "Acesso negado"
+ *               apenasAdmin:
+ *                 value:
+ *                   error: "Acesso negado. Apenas administradores podem alterar funções."
+ *       404:
+ *         description: Usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro ao atualizar usuário
+ */
 // Update an user
 router.put("/:id", verifyToken, async (req, res) => {
 
@@ -154,6 +365,57 @@ router.put("/:id", verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   delete:
+ *     summary: Deletar usuário
+ *     description: Remove um usuário do sistema (apenas admin)
+ *     tags: [Usuários]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do usuário a ser deletado
+ *         example: "507f1f77bcf86cd799439011"
+ *     responses:
+ *       200:
+ *         description: Usuário deletado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Usuário deletado com sucesso"
+ *       401:
+ *         description: Acesso negado - apenas admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Acesso negado, apenas administradores podem deletar usuários."
+ *       404:
+ *         description: Usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Usuário não encontrado"
+ *       500:
+ *         description: Erro ao deletar usuário
+ */
 // Delete an user by ID
 router.delete("/:id", verifyToken, async (req, res) => {
     const id = req.params.id;

@@ -5,6 +5,78 @@ const jwt = require('jsonwebtoken');
 // Import User model
 const User = require('../models/user');
 
+/**
+ * @swagger
+ * /api/auth/register:
+ *   post:
+ *     summary: Registrar novo usuário
+ *     description: Cria uma nova conta de usuário no sistema
+ *     tags: [Autenticação]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserRegister'
+ *           example:
+ *             name: "João Silva"
+ *             email: "joao@email.com"
+ *             password: "senha123"
+ *             confirmpassword: "senha123"
+ *             role: "user"
+ *     responses:
+ *       200:
+ *         description: Usuário registrado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Registro realizado com sucesso"
+ *                 token:
+ *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 userId:
+ *                   type: string
+ *                   example: "507f1f77bcf86cd799439011"
+ *       400:
+ *         description: Erro de validação
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *               examples:
+ *                 camposObrigatorios:
+ *                   value:
+ *                     error: "Por favor preencha todos os campos obrigatórios"
+ *                 senhasNaoCoincidem:
+ *                   value:
+ *                     error: "As senhas não coincidem"
+ *                 funcaoInvalida:
+ *                   value:
+ *                     error: "Função inválida"
+ *                 emailEmUso:
+ *                   value:
+ *                     error: "O e-mail já está em uso"
+ *       500:
+ *         description: Erro interno do servidor
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: object
+ */
 // Register an User
 router.post("/register", async (req, res) => {
 
@@ -72,6 +144,63 @@ router.post("/register", async (req, res) => {
 
 });
 
+/**
+ * @swagger
+ * /api/auth/login:
+ *   post:
+ *     summary: Login de usuário
+ *     description: Autentica um usuário e retorna um token JWT
+ *     tags: [Autenticação]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/UserLogin'
+ *           example:
+ *             email: "joao@email.com"
+ *             password: "senha123"
+ *     responses:
+ *       200:
+ *         description: Login realizado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Você está autenticado"
+ *                 token:
+ *                   type: string
+ *                   example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ *                 userId:
+ *                   type: string
+ *                   example: "507f1f77bcf86cd799439011"
+ *       400:
+ *         description: Erro de autenticação
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *               examples:
+ *                 camposObrigatorios:
+ *                   value:
+ *                     error: "Por favor preencha todos os campos obrigatórios"
+ *                 usuarioNaoEncontrado:
+ *                   value:
+ *                     error: "Não há um usuário cadastrado com este e-mail"
+ *                 senhaInvalida:
+ *                   value:
+ *                     error: "Senha inválida"
+ */
 // Login an User
 router.post("/login", async (req, res) => {
 

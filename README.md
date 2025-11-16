@@ -4,6 +4,7 @@
 
 [![Node.js](https://img.shields.io/badge/Node.js-24.x-green.svg)](https://nodejs.org/)
 [![MongoDB](https://img.shields.io/badge/MongoDB-8.x-green.svg)](https://www.mongodb.com/)
+[![Swagger](https://img.shields.io/badge/Swagger-OpenAPI%203.0-green.svg)](http://localhost:8000/api/docs)
 [![License](https://img.shields.io/badge/license-ISC-blue.svg)](LICENSE)
 
 ---
@@ -36,12 +37,30 @@ Servidor rodando em `http://localhost:8000`
 
 ---
 
+## 📖 Documentação da API
+
+### 🎯 **Swagger UI (Recomendado)**
+Acesse a documentação interativa completa:
+
+```
+http://localhost:8000/api/docs
+```
+
+**Recursos:**
+- ✅ Teste todos os endpoints diretamente no navegador
+- ✅ Visualize schemas de request/response
+- ✅ Autenticação JWT integrada
+- ✅ Exemplos de uso para cada endpoint
+
+---
+
 ## 🛠️ Tecnologias
 
 - **Node.js** + **Express.js** - Backend framework
 - **MongoDB** + **Mongoose** - Banco de dados
 - **JWT** - Autenticação
 - **Bcrypt** - Criptografia de senhas
+- **Swagger** - Documentação da API
 
 ---
 
@@ -51,93 +70,78 @@ Servidor rodando em `http://localhost:8000`
 Backend/
 ├── models/          # Schemas (User, Form, Question, Response)
 ├── routes/          # Rotas da API
-├── middleware/      # Autenticação e validação
+├── helpers/         # Autenticação e validação
+├── swagger.js       # Configuração Swagger
 ├── .env.example     # Template de variáveis
 └── server.js        # Entry point
 ```
 
 ---
 
-## 🔌 API Endpoints
+## 🔌 Endpoints Principais
 
-### Autenticação
+| Categoria | Endpoint | Descrição |
+|-----------|----------|-----------|
+| **Auth** | `POST /api/auth/register` | Registrar usuário |
+| **Auth** | `POST /api/auth/login` | Login |
+| **Users** | `GET /api/users` | Listar usuários |
+| **Questions** | `POST /api/questions` | Criar questão |
+| **Forms** | `POST /api/forms` | Criar formulário |
+| **Responses** | `POST /api/responses` | Submeter resposta |
+| **Dashboards** | `GET /api/dashboards/full-analysis/:formId` | Análise completa |
 
-**Registrar Usuário**
-```http
-POST /api/auth/register
-{
-  "name": "João Silva",
-  "email": "joao@email.com",
-  "password": "senha123",
-  "confirmpassword": "senha123",
-  "role": "user"
-}
-```
-
-**Resposta:**
-```json
-{
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-  "user": { "id": "...", "name": "...", "role": "..." }
-}
-```
-
-### Outros Endpoints *(em desenvolvimento)*
-- `GET/POST /api/forms` - Gerenciar formulários
-- `GET/POST /api/questions` - Gerenciar questões
-- `POST /api/responses` - Submeter respostas
+**📚 [Ver documentação completa no Swagger](http://localhost:8000/api/docs)**
 
 ---
 
-## 🗄️ Modelos de Dados
+## 🔒 Autenticação
 
-**User** - Usuários do sistema (admin, staff, user)  
-**Question** - Questões reutilizáveis (text, multiple_choice, etc.)  
-**Form** - Formulários com questões vinculadas  
-**Response** - Respostas dos usuários aos formulários
+Todas as rotas (exceto registro e login) requerem autenticação JWT.
+
+**No Swagger:**
+1. Faça login em `/api/auth/login`
+2. Copie o token retornado
+3. Clique em "Authorize" no topo
+4. Cole o token (sem "Bearer")
 
 ---
 
-## ⚙️ Variáveis de Ambiente
+## 🧪 Testando a API
+
+### Opção 1: Swagger UI ⭐
+```
+http://localhost:8000/api/docs
+```
+
+### Opção 2: cURL
+```bash
+# Login
+curl -X POST http://localhost:8000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@email.com","password":"senha123"}'
+
+# Listar formulários
+curl -X GET http://localhost:8000/api/forms \
+  -H "auth-token: SEU_TOKEN_AQUI"
+```
+
+---
+
+## 📊 Variáveis de Ambiente
 
 ```env
-JWT_SECRET=sua-chave-secreta-aqui
-PORT=
-DB_NAME=
+PORT=numero_da_porta
+DB_USER=seu_usuario
+DB_PASSWORD=sua_senha
+DB_NAME=m2tie
+SECRET=seu_secret_jwt
 ```
 
-## 🔒 Segurança
-
-- ✅ Hash de senhas com Bcrypt
-- ✅ Autenticação JWT (expiração 24h)
-- ✅ Validação de entrada
-- ✅ CORS habilitado
-- ✅ Variáveis sensíveis em `.env`
-
 ---
 
-## 🚧 Roadmap
+## 📝 Licença
 
-- [x] Autenticação JWT
-- [x] Modelos de Dados
-- [ ] CRUD de Formulários
-- [ ] Sistema de Respostas
-- [ ] Análise de Dados
-- [ ] Testes Automatizados
-- [ ] Documentação Swagger
-
----
-
-## 📄 Licença
-
-Este projeto está sob a licença ISC.
-
----
-
-## 📧 Contato
-
-**Augusto Freitas**  
-GitHub: [@AugustoCF](https://github.com/AugustoCF)
+ISC © 2025 Augusto Freitas
 
 ---
 

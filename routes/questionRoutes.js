@@ -11,6 +11,102 @@ const verifyToken = require('../helpers/check-token');
 const getUserByToken = require('../helpers/get-user-by-token');
 const { validateQuestion, validateQuestionUpdate } = require('../helpers/validate-question-fields');
 
+/**
+ * @swagger
+ * /api/questions:
+ *   post:
+ *     summary: Criar nova questão
+ *     description: Cria uma nova questão para ser utilizada em formulários (apenas admin)
+ *     tags: [Questões]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/QuestionCreate'
+ *           examples:
+ *             textoSimples:
+ *               summary: Questão de texto
+ *               value:
+ *                 title: "Qual o seu nome completo?"
+ *                 type: "text"
+ *                 validation:
+ *                   required: true
+ *                   minLength: 3
+ *                   maxLength: 100
+ *             multiplaEscolha:
+ *               summary: Múltipla escolha
+ *               value:
+ *                 title: "Qual a sua faixa etária?"
+ *                 type: "multiple_choice"
+ *                 options:
+ *                   - label: "18-25 anos"
+ *                     value: "18_25"
+ *                   - label: "26-35 anos"
+ *                     value: "26_35"
+ *                   - label: "36+ anos"
+ *                     value: "36_plus"
+ *                 validation:
+ *                   required: true
+ *             escala:
+ *               summary: Escala de 1 a 10
+ *               value:
+ *                 title: "Nível de satisfação (1-10)"
+ *                 type: "scale"
+ *                 validation:
+ *                   required: true
+ *     responses:
+ *       201:
+ *         description: Questão criada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Questão criada com sucesso"
+ *                 data:
+ *                   $ref: '#/components/schemas/Question'
+ *       400:
+ *         description: Erro de validação
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               tituloObrigatorio:
+ *                 value:
+ *                   error: "O título é obrigatório"
+ *               tipoInvalido:
+ *                 value:
+ *                   error: "Tipo de questão inválido"
+ *               opcoesFaltando:
+ *                 value:
+ *                   error: "Questões do tipo multiple_choice, checkbox e dropdown requerem opções"
+ *       401:
+ *         description: Acesso negado - apenas admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Acesso negado, apenas administradores podem criar questões"
+ *       404:
+ *         description: Usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro ao criar a questão
+ */
 // Create new Question
 router.post("/", verifyToken, async (req, res) => {
     
@@ -72,6 +168,51 @@ router.post("/", verifyToken, async (req, res) => {
     } 
 });
 
+/**
+ * @swagger
+ * /api/questions/all:
+ *   get:
+ *     summary: Listar todas as questões
+ *     description: Retorna todas as questões cadastradas no sistema (apenas admin e staff)
+ *     tags: [Questões]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Questões encontradas com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Questões encontradas com sucesso"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Question'
+ *       401:
+ *         description: Acesso negado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Acesso negado, apenas administradores e equipe podem acessar as questões"
+ *       404:
+ *         description: Usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro interno do servidor
+ */
 // Get all Questions for staff and admin
 router.get("/all", verifyToken, async (req, res) => {
     try {
@@ -102,6 +243,62 @@ router.get("/all", verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/questions/{id}:
+ *   get:
+ *     summary: Obter questão por ID
+ *     description: Retorna uma questão específica (apenas admin e staff)
+ *     tags: [Questões]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID da questão
+ *         example: "507f1f77bcf86cd799439011"
+ *     responses:
+ *       200:
+ *         description: Questão encontrada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Questão encontrada com sucesso"
+ *                 data:
+ *                   $ref: '#/components/schemas/Question'
+ *       401:
+ *         description: Acesso negado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Questão ou usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               usuarioNaoEncontrado:
+ *                 value:
+ *                   error: "Usuário não encontrado"
+ *               questaoNaoEncontrada:
+ *                 value:
+ *                   error: "Questão não encontrada"
+ *       500:
+ *         description: Erro interno do servidor
+ */
 // Get Question by ID
 router.get("/:id", verifyToken, async (req, res) => {
 
@@ -139,6 +336,55 @@ router.get("/:id", verifyToken, async (req, res) => {
 
 });
 
+/**
+ * @swagger
+ * /api/questions/{id}:
+ *   delete:
+ *     summary: Deletar questão
+ *     description: Remove uma questão do sistema (apenas admin)
+ *     tags: [Questões]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID da questão
+ *         example: "507f1f77bcf86cd799439011"
+ *     responses:
+ *       200:
+ *         description: Questão deletada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Questão deletada com sucesso"
+ *       401:
+ *         description: Acesso negado - apenas admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Acesso negado, apenas administradores podem deletar questões"
+ *       404:
+ *         description: Questão ou usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro interno do servidor
+ */
 // Delete Question
 router.delete("/:id", verifyToken, async (req, res) => {
     
@@ -172,6 +418,116 @@ router.delete("/:id", verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/questions/{id}:
+ *   put:
+ *     summary: Atualizar questão
+ *     description: Atualiza informações de uma questão existente (apenas admin)
+ *     tags: [Questões]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID da questão
+ *         example: "507f1f77bcf86cd799439011"
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *                 example: "Qual é o seu nome completo?"
+ *               type:
+ *                 type: string
+ *                 enum: [text, multiple_choice, checkbox, dropdown, scale, date]
+ *                 example: "text"
+ *               options:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     label:
+ *                       type: string
+ *                     value:
+ *                       type: string
+ *               validation:
+ *                 type: object
+ *                 properties:
+ *                   required:
+ *                     type: boolean
+ *                   minLength:
+ *                     type: number
+ *                   maxLength:
+ *                     type: number
+ *                   pattern:
+ *                     type: string
+ *           examples:
+ *             atualizarTitulo:
+ *               summary: Atualizar apenas título
+ *               value:
+ *                 title: "Qual é o seu nome completo?"
+ *             atualizarCompleto:
+ *               summary: Atualizar tudo
+ *               value:
+ *                 title: "Qual a sua idade?"
+ *                 type: "multiple_choice"
+ *                 options:
+ *                   - label: "Menos de 18"
+ *                     value: "under_18"
+ *                   - label: "18-30"
+ *                     value: "18_30"
+ *                   - label: "31+"
+ *                     value: "31_plus"
+ *                 validation:
+ *                   required: true
+ *     responses:
+ *       200:
+ *         description: Questão atualizada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Questão atualizada com sucesso"
+ *                 data:
+ *                   $ref: '#/components/schemas/Question'
+ *       400:
+ *         description: Erro de validação
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       401:
+ *         description: Acesso negado - apenas admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Acesso negado, apenas administradores podem atualizar questões"
+ *       404:
+ *         description: Questão ou usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro ao atualizar a questão
+ */
 // Update Question
 router.put("/:id", verifyToken, async (req, res) => {
 
