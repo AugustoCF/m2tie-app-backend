@@ -571,24 +571,28 @@ router.get("/export/:formId", verifyToken, async (req, res) => {
         const responses = await Response.find({ formId }).populate('userId', 'name email');
 
         // Prepare data
-        const exportData = responses.map(response => {
-            const data = {
-                respondent: response.userId.name,
-                email: response.userId.email,
-                submittedAt: response.submittedAt
-            };
+        const exportData = responses
+            .filter(response => response.userId) // Ignora respostas de usuários deletados
+            .map(response => {
+                const data = {
+                    respondent: response.userId.name,
+                    email: response.userId.email,
+                    submittedAt: response.submittedAt
+                };
 
-            response.answers.forEach(answer => {
-                const question = form.questions.find(q => 
-                    q.questionId._id.toString() === answer.questionId.toString()
-                );
-                if (question) {
-                    data[question.questionId.title] = answer.answer;
-                }
+                response.answers.forEach(answer => {
+                    const question = form.questions.find(q => 
+                        q.questionId._id.toString() === answer.questionId.toString()
+                    );
+                    if (question) {
+                        data[question.questionId.title] = Array.isArray(answer.answer) 
+                            ? answer.answer.join(', ') 
+                            : answer.answer;
+                    }
+                });
+
+                return data;
             });
-
-            return data;
-        });
 
         return res.status(200).json({
             formTitle: form.title,

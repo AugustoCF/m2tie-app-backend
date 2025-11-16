@@ -267,14 +267,23 @@ router.post("/", verifyToken, async (req, res) => {
  *                               description:
  *                                 type: string
  *                           userId:
- *                             type: object
- *                             properties:
- *                               _id:
- *                                 type: string
- *                               name:
- *                                 type: string
- *                               email:
- *                                 type: string
+ *                             oneOf:
+ *                               - type: object
+ *                                 properties:
+ *                                   _id:
+ *                                     type: string
+ *                                   name:
+ *                                     type: string
+ *                                   email:
+ *                                     type: string
+ *                               - type: object
+ *                                 properties:
+ *                                   name:
+ *                                     type: string
+ *                                     example: "Usuário Deletado"
+ *                                   email:
+ *                                     type: string
+ *                                     example: "N/A"
  *                           answers:
  *                             type: array
  *                             items:
@@ -340,7 +349,26 @@ router.get("/all", verifyToken, async (req, res) => {
             .populate('userId', 'name email')
             .populate('answers.questionId', 'title type options');
 
-        return res.status(200).json({ error: null, msg: "Respostas encontradas com sucesso", data: responses });
+        // Tratar respostas com usuários deletados
+        const responsesWithDeletedUsers = responses.map(response => {
+            const responseObj = response.toObject();
+            
+            // Se userId for null, substituir por "Usuário Deletado"
+            if (!responseObj.userId) {
+                responseObj.userId = {
+                    name: "Usuário Deletado",
+                    email: "N/A"
+                };
+            }
+            
+            return responseObj;
+        });
+
+        return res.status(200).json({ 
+            error: null, 
+            msg: "Respostas encontradas com sucesso", 
+            data: responsesWithDeletedUsers 
+        });
 
         
     } catch (error) {
@@ -394,14 +422,23 @@ router.get("/all", verifyToken, async (req, res) => {
  *                             description:
  *                               type: string
  *                         userId:
- *                           type: object
- *                           properties:
- *                             name:
- *                               type: string
- *                               example: "João Silva"
- *                             email:
- *                               type: string
- *                               example: "joao@email.com"
+ *                           oneOf:
+ *                             - type: object
+ *                               properties:
+ *                                 name:
+ *                                   type: string
+ *                                   example: "João Silva"
+ *                                 email:
+ *                                   type: string
+ *                                   example: "joao@email.com"
+ *                             - type: object
+ *                               properties:
+ *                                 name:
+ *                                   type: string
+ *                                   example: "Usuário Deletado"
+ *                                 email:
+ *                                   type: string
+ *                                   example: "N/A"
  *       401:
  *         description: Acesso negado
  *         content:
@@ -460,7 +497,21 @@ router.get("/:id", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Resposta não encontrada" });
         }
 
-        return res.status(200).json({ error: null, msg: "Resposta encontrada com sucesso", data: response });
+        // Tratar caso o usuário tenha sido deletado
+        const responseObj = response.toObject();
+        
+        if (!responseObj.userId) {
+            responseObj.userId = {
+                name: "Usuário Deletado",
+                email: "N/A"
+            };
+        }
+
+        return res.status(200).json({ 
+            error: null, 
+            msg: "Resposta encontrada com sucesso", 
+            data: responseObj 
+        });
 
     } catch (error) {
         return res.status(500).json({ error });
