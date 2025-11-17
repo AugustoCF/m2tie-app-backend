@@ -18,6 +18,10 @@ const responseSchema = new mongoose.Schema({
         },
         answer: mongoose.Schema.Types.Mixed
     }],
+    deleted: {
+        type: Boolean,
+        default: false
+    },
     submittedAt: {
         type: Date,
         default: Date.now

@@ -18,6 +18,10 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: ['admin', 'staff', 'user'],
         required: true
+    },
+    deleted: {
+        type: Boolean,
+        default: false
     }
 });
 

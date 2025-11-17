@@ -23,6 +23,10 @@ const formSchema = new mongoose.Schema({
         type: Boolean,
         default: true
     },
+    deleted: {
+        type: Boolean,
+        default: false
+    },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'

@@ -66,7 +66,7 @@ router.get("/all", verifyToken, async (req, res) => {
     try {
 
         // Verify ADMIN role
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
 
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
@@ -76,7 +76,7 @@ router.get("/all", verifyToken, async (req, res) => {
         }
 
         // Get all users
-        const users = await User.find({}, {  password: 0 });
+        const users = await User.find({ deleted: false }, {  password: 0 });
 
         res.json({ error: null, msg: "Usuários encontrados com sucesso", data: users });
         
@@ -135,7 +135,7 @@ router.get("/:id", verifyToken, async (req, res) => {
 
     try {
         // Verify if user exists
-        const user = await User.findOne({ _id: id }, {  password: 0 });
+        const user = await User.findOne({ _id: id, deleted: false }, {  password: 0 });
 
         res.json({ error: null, msg: "Usuário encontrado com sucesso", data: user });
 
@@ -284,7 +284,7 @@ router.put("/:id", verifyToken, async (req, res) => {
     try {
 
         // Check if user exists in DB
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
 
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
@@ -426,7 +426,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
     try {
 
         // Check ADMIN role
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
@@ -434,10 +434,14 @@ router.delete("/:id", verifyToken, async (req, res) => {
             return res.status(401).json({ error: "Acesso negado, apenas administradores podem deletar usuários." });
         }
 
-        // Verify if the user exists and delete
-        const deletedUser = await User.findByIdAndDelete(id);
+        // Soft delete: set deleted flag to true
+        const updatedUser = await User.findByIdAndUpdate(
+            id,
+            { $set: { deleted: true } },
+            { new: true }
+        );
 
-        if (!deletedUser) {
+        if (!updatedUser) {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 

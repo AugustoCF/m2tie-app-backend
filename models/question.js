@@ -20,6 +20,10 @@ const questionSchema = new mongoose.Schema({
         maxLength: Number,
         pattern: String
     },
+    deleted: {
+        type: Boolean,
+        default: false
+    },
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

@@ -137,7 +137,7 @@ router.get("/analysis/:formId/:questionId", verifyToken, async (req, res) => {
     try {
 
         // Verify user
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado." });
         }
@@ -148,24 +148,30 @@ router.get("/analysis/:formId/:questionId", verifyToken, async (req, res) => {
         }
 
         // Verify form
-        const form = await Form.findOne({ _id: formId });
+        const form = await Form.findOne({ _id: formId, deleted: false });
         if (!form) {
             return res.status(404).json({ error: "Formulário não encontrado." });
         }
 
         // Verify question
-        const question = await Question.findOne({ _id: questionId });
+        const question = await Question.findOne({ _id: questionId, deleted: false });
         if (!question) {
             return res.status(404).json({ error: "Questão não encontrada." });
         }
 
         // Get responses
-        const responses = await Response.find({ formId });
+        const responses = await Response.find({ formId, deleted: false });
 
-        const answers = responses.map(r => {
-            const answer = r.answers.find(a => a.questionId.toString() === questionId);
-            return answer ? answer.answer : null;
-        }).filter(a => a !== null);
+        // Filtra as respostas para remover answers com questionId null
+        const filteredResponses = responses.map(response => {
+            const filteredAnswers = response.answers.filter(a => a.questionId && a.questionId.toString() === questionId);
+            return {
+                ...response.toObject(),
+                answers: filteredAnswers
+            };
+        });
+
+        const answers = filteredResponses.map(r => r.answers[0]?.answer).filter(a => a !== undefined);
 
         // Analyze based on question type
         let analysis = {};
@@ -361,7 +367,7 @@ router.get("/full-analysis/:formId", verifyToken, async (req, res) => {
     try {
 
         // Verify user
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado." });
         }
@@ -372,22 +378,46 @@ router.get("/full-analysis/:formId", verifyToken, async (req, res) => {
         }
 
         // Verify form
-        const form = await Form.findOne({ _id: formId }).populate('questions.questionId');
+        const form = await Form.findOne({ _id: formId, deleted: false })
+            .populate({
+                path: 'questions.questionId',
+                match: { deleted: false }
+            });
         if (!form) {
             return res.status(404).json({ error: "Formulário não encontrado." });
         }
 
         // Get responses
-        const responses = await Response.find({ formId });
-        const totalResponses = responses.length;
+        const responses = await Response.find({ formId, deleted: false })
+            .populate({
+                path: 'userId',
+                select: 'name email',
+                match: { deleted: false }
+            });
+
+        // Filtra respostas de usuários deletados
+        const filteredResponses = responses
+            .filter(r => r.userId !== null)
+            .map(response => {
+                const filteredAnswers = response.answers.filter(a => a.questionId !== null);
+                return {
+                    ...response.toObject(),
+                    answers: filteredAnswers
+                };
+            });
+
+        // Filtra as questões do formulário para remover as que foram soft deleted
+        const validQuestions = form.questions.filter(q => q.questionId !== null);
+
+        const totalResponses = filteredResponses.length;
         const questionsAnalysis = [];
 
-        for (const formQuestion of form.questions) {
+        for (const formQuestion of validQuestions) {
             const question = formQuestion.questionId;
             const questionId = question._id.toString();
 
-            const answers = responses.map(r => {
-                const answer = r.answers.find(a => a.questionId.toString() === questionId);
+            const answers = filteredResponses.map(r => {
+                const answer = r.answers.find(a => a.questionId && a.questionId.toString() === questionId);
                 return answer ? answer.answer : null;
             }).filter(a => a !== null);
 
@@ -551,7 +581,7 @@ router.get("/export/:formId", verifyToken, async (req, res) => {
     try {
 
         // Verify user
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado." });
         }
@@ -562,13 +592,25 @@ router.get("/export/:formId", verifyToken, async (req, res) => {
         }
 
         // Verify form
-        const form = await Form.findOne({ _id: formId }).populate('questions.questionId');;
+        const form = await Form.findOne({ _id: formId, deleted: false })
+            .populate({
+                path: 'questions.questionId',
+                match: { deleted: false }
+            });
         if (!form) {
             return res.status(404).json({ error: "Formulário não encontrado." });
         }
 
         // Get responses
-        const responses = await Response.find({ formId }).populate('userId', 'name email');
+        const responses = await Response.find({ formId, deleted: false })
+            .populate({
+                path: 'userId',
+                select: 'name email',
+                match: { deleted: false }
+            });
+
+        // Após buscar o form:
+        const validQuestions = form.questions.filter(q => q.questionId !== null);
 
         // Prepare data
         const exportData = responses
@@ -580,16 +622,18 @@ router.get("/export/:formId", verifyToken, async (req, res) => {
                     submittedAt: response.submittedAt
                 };
 
-                response.answers.forEach(answer => {
-                    const question = form.questions.find(q => 
-                        q.questionId._id.toString() === answer.questionId.toString()
-                    );
-                    if (question) {
-                        data[question.questionId.title] = Array.isArray(answer.answer) 
-                            ? answer.answer.join(', ') 
-                            : answer.answer;
-                    }
-                });
+                response.answers
+                    .filter(answer => answer.questionId !== null) // só answers válidas
+                    .forEach(answer => {
+                        const question = validQuestions.find(q => 
+                            q.questionId._id.toString() === answer.questionId.toString()
+                        );
+                        if (question) {
+                            data[question.questionId.title] = Array.isArray(answer.answer) 
+                                ? answer.answer.join(', ') 
+                                : answer.answer;
+                        }
+                    });
 
                 return data;
             });
@@ -713,7 +757,7 @@ router.get("/:formId", verifyToken, async (req, res) => {
     // Verify user
     try {
 
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado." });
         }
@@ -724,24 +768,42 @@ router.get("/:formId", verifyToken, async (req, res) => {
         }
 
         // Verify form
-        const form = await Form.findOne({ _id: formId });
+        const form = await Form.findOne({ _id: formId, deleted: false });
         if (!form) {
             return res.status(404).json({ error: "Formulário não encontrado." });
         }
 
         // Get responses
-        const totalResponses = await Response.countDocuments({ formId });
-        const responses = await Response.find({ formId })
-            .populate('userId', 'name email')
-            .populate('answers.questionId', 'title type options');
+        const totalResponses = await Response.countDocuments({ formId, deleted: false });
+        const responses = await Response.find({ formId, deleted: false })
+            .populate({
+                path: 'userId',
+                select: 'name email',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'answers.questionId',
+                select: 'title type options',
+                match: { deleted: false }
+            });
 
+        // Filtra respostas cujo userId ficou null (usuário deletado)
+        const filteredResponses = responses
+            .filter(response => response.userId !== null)
+            .map(response => {
+                const filteredAnswers = response.answers.filter(a => a.questionId !== null);
+                return {
+                    ...response.toObject(),
+                    answers: filteredAnswers
+                };
+            });
 
         return res.status(200).json({ 
             error: null, 
             message: "Dados obtidos com sucesso!", 
             form: form.title,
-            totalResponses,
-            responses 
+            totalResponses: filteredResponses.length,
+            responses: filteredResponses
         });
 
     } catch (error) {

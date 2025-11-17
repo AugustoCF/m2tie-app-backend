@@ -105,7 +105,7 @@ router.post("/", verifyToken, async (req, res) => {
 
     // Verify Admin user
     try {
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
 
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
@@ -132,7 +132,7 @@ router.post("/", verifyToken, async (req, res) => {
             return res.status(400).json({ error: "Um ou mais IDs de questão são inválidos" });
         }
 
-        const existingQuestions = await Question.find({ _id: { $in: questionIds } });
+        const existingQuestions = await Question.find({ _id: { $in: questionIds }, deleted: false });
 
         if (existingQuestions.length !== questionIds.length) {
             return res.status(400).json({ error: "Uma ou mais questões não foram encontradas" });
@@ -213,18 +213,49 @@ router.get("/all", verifyToken, async (req, res) => {
     const userId = userByToken._id.toString();
 
     try {
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
 
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
-        const forms = await Form.find()
+        const forms = await Form.find({ deleted: false })
             .sort({ createdAt: -1 })
-            .populate('questions.questionId')
-            .populate('createdBy', 'name email role');
+            .populate({
+                path: 'questions.questionId',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'createdBy',
+                select: 'name email role',
+                match: { deleted: false }
+            });
 
-        return res.status(200).json({ error: null, msg: "Formulários encontrados com sucesso", data: forms });
+        // Para cada formulário, conte as respostas válidas
+        const formsWithResponseCount = await Promise.all(forms.map(async form => {
+            const responses = await Response.find({
+                formId: form._id,
+                deleted: false
+            }).populate({
+                path: 'userId',
+                match: { deleted: false }
+            });
+            const validResponsesCount = responses.filter(r => r.userId !== null).length;
+
+            const filteredQuestions = form.questions.filter(q => q.questionId !== null);
+
+            return {
+                ...form.toObject(),
+                questions: filteredQuestions,
+                totalResponses: validResponsesCount
+            };
+        }));
+
+        return res.status(200).json({ 
+            error: null, 
+            msg: "Formulários encontrados com sucesso", 
+            data: formsWithResponseCount 
+        });
 
     } catch (error) {
         return res.status(500).json({ error });
@@ -307,37 +338,35 @@ router.get("/active", verifyToken, async (req, res) => {
     const userId = userByToken._id.toString();
 
     try {
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
 
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
-        const form = await Form.findOne({ isActive: true })
-            .populate('questions.questionId')
-            .populate('createdBy', 'name email role');
+        const form = await Form.findOne({ isActive: true, deleted: false })
+            .populate({
+                path: 'questions.questionId',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'createdBy',
+                select: 'name email role',
+                match: { deleted: false }
+            });
 
         if (!form) {
             return res.status(404).json({ error: "Formulário ativo não encontrado" });
         }
 
-        // Check if the user has already responded to this form
-        const existingResponse = await Response.findOne({ formId: form._id, userId: userId })
-            .populate('formId', 'title description');
+        // Filtra as questões para remover as que têm questionId null
+        const filteredQuestions = form.questions.filter(q => q.questionId !== null);
 
-        if (existingResponse) {
-            return res.status(200).json({ 
-                error: null, 
-                msg: "Formulário já respondido", 
-                data: {
-                    formTitle: existingResponse.formId.title,
-                    submittedAt: existingResponse.submittedAt,
-                    responseId: existingResponse._id
-                }
-            });
-        }
-
-        return res.status(200).json({ error: null, msg: "Formulário ativo encontrado com sucesso", data: form });
+        return res.status(200).json({ 
+            error: null, 
+            msg: "Formulário ativo encontrado com sucesso", 
+            data: { ...form.toObject(), questions: filteredQuestions }
+        });
 
     } catch (error) {
         return res.status(500).json({ error });
@@ -396,21 +425,36 @@ router.get("/:id", verifyToken, async (req, res) => {
     const userId = userByToken._id.toString();
 
     try {
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
 
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
-        const form = await Form.findOne({ _id: formId })
-            .populate('questions.questionId')
-            .populate('createdBy', 'name email role');
+        const form = await Form.findOne({ _id: formId, deleted: false })
+            .populate({
+                path: 'questions.questionId',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'createdBy',
+                select: 'name email role',
+                match: { deleted: false }
+            });
 
         if (!form) {
             return res.status(404).json({ error: "Formulário não encontrado" });
         }
 
-        return res.status(200).json({ error: null, msg: "Formulário encontrado com sucesso", data: form });
+        // Filtra as questões para remover as que têm questionId null
+        const filteredQuestions = form.questions.filter(q => q.questionId !== null);
+
+        // Retorna o formulário com as questões filtradas
+        return res.status(200).json({ 
+            error: null, 
+            msg: "Formulário encontrado com sucesso", 
+            data: { ...form.toObject(), questions: filteredQuestions }
+        });
 
     } catch (error) {
         return res.status(500).json({ error });
@@ -475,7 +519,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
     const userId = userByToken._id.toString();
 
     try {
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
 
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
@@ -485,10 +529,14 @@ router.delete("/:id", verifyToken, async (req, res) => {
             return res.status(401).json({ error: "Apenas administradores podem deletar formulários." });
         }
 
-        // Verify if form exists and delete
-        const deletedForm = await Form.findByIdAndDelete(formId);
+        // Soft delete: set deleted flag to true
+        const updatedForm = await Form.findByIdAndUpdate(
+            formId,
+            { $set: { deleted: true } },
+            { new: true }
+        );
 
-        if (!deletedForm) {
+        if (!updatedForm) {
             return res.status(404).json({ error: "Formulário não encontrado" });
         }
 
@@ -594,7 +642,7 @@ router.put("/:id", verifyToken, async (req, res) => {
 
     try {
 
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
 
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
@@ -604,7 +652,7 @@ router.put("/:id", verifyToken, async (req, res) => {
             return res.status(401).json({ error: "Apenas administradores podem atualizar formulários." });
         }
 
-        const form = await Form.findOne({ _id: formId });
+        const form = await Form.findOne({ _id: formId, deleted: false });
 
         if (!form) {
             return res.status(404).json({ error: "Formulário não encontrado" });
@@ -662,12 +710,17 @@ router.put("/:id", verifyToken, async (req, res) => {
             { _id: formId }, 
             { $set: updateData }, 
             { new: true }
-        ).populate('questions.questionId');
+        ).populate({
+            path: 'questions.questionId',
+            match: { deleted: false }
+        });
+
+        const filteredQuestions = updatedForm.questions.filter(q => q.questionId !== null);
 
         return res.status(200).json({ 
             error: null, 
             msg: "Formulário atualizado com sucesso", 
-            data: updatedForm 
+            data: { ...updatedForm.toObject(), questions: filteredQuestions }
         });
 
     } catch (error) {

@@ -3,6 +3,8 @@ const router = require('express').Router();
 // Models
 const Question = require('../models/question');
 const User = require('../models/user');
+const Response = require('../models/response');
+const Form = require('../models/form');
 
 // Middlewares
 const verifyToken = require('../helpers/check-token');
@@ -137,7 +139,7 @@ router.post("/", verifyToken, async (req, res) => {
     // Verify user
     try {
 
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
 
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
@@ -222,7 +224,7 @@ router.get("/all", verifyToken, async (req, res) => {
         const userId = userByToken._id.toString();
 
         // Verify user
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
 
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
@@ -232,9 +234,14 @@ router.get("/all", verifyToken, async (req, res) => {
             return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar as questões" });
         }
         
-        const questions = await Question.find()
+        const questions = await Question.find({ deleted: false })
             .sort({ createdAt: -1 })
-            .populate('createdBy', 'name email role');
+            .populate({
+                path: 'createdBy',
+                select: 'name email role',
+                match: { deleted: false }
+            });
+            
 
         return res.status(200).json({ error: null, msg: "Questões encontradas com sucesso", data: questions });
 
@@ -309,7 +316,7 @@ router.get("/:id", verifyToken, async (req, res) => {
         const userId = userByToken._id.toString();
 
         // Verify user
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
 
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
@@ -321,8 +328,12 @@ router.get("/:id", verifyToken, async (req, res) => {
 
         const questionId = req.params.id;
 
-        const question = await Question.findById(questionId)
-            .populate('createdBy', 'name email role');
+        const question = await Question.findOne({ _id: questionId, deleted: false })
+            .populate({
+                path: 'createdBy',
+                select: 'name email role',
+                match: { deleted: false }
+            });
 
         if (!question) {
             return res.status(404).json({ error: "Questão não encontrada" });
@@ -395,7 +406,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
 
     try {
         // Verify user
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
@@ -404,10 +415,14 @@ router.delete("/:id", verifyToken, async (req, res) => {
             return res.status(401).json({ error: "Acesso negado, apenas administradores podem deletar questões" });
         }
 
-        // Verify if question exists and delete
-        const deletedQuestion = await Question.findByIdAndDelete(questionId);
+        // Soft delete: set deleted flag to true
+        const updatedQuestion = await Question.findByIdAndUpdate(
+            questionId,
+            { $set: { deleted: true } },
+            { new: true }
+        );
 
-        if (!deletedQuestion) {
+        if (!updatedQuestion) {
             return res.status(404).json({ error: "Questão não encontrada" });
         }
 
@@ -546,7 +561,7 @@ router.put("/:id", verifyToken, async (req, res) => {
     // Verify user
     try {
 
-        const user = await User.findOne({ _id: userId });
+        const user = await User.findOne({ _id: userId, deleted: false });
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
@@ -555,7 +570,7 @@ router.put("/:id", verifyToken, async (req, res) => {
         }
 
         // Find question
-        const question = await Question.findOne({ _id: questionId });
+        const question = await Question.findOne({ _id: questionId, deleted: false });
         if (!question) {
             return res.status(404).json({ error: "Questão não encontrada" });
         }
