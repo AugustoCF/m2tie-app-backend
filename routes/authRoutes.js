@@ -81,13 +81,17 @@ const User = require('../models/user');
 router.post("/register", async (req, res) => {
 
     const name = req.body.name;
+    const anonymous = req.body.anonymous;
     const email = req.body.email;
     const password = req.body.password;
     const confirmpassword = req.body.confirmPassword;
     const role = req.body.role;
+    const city = req.body.city;
+    const state = req.body.state;
+    const institution = req.body.institution;
 
     // Check for required fields
-    if (!name || !email || !password || !confirmpassword || !role) {
+    if (!name || anonymous === undefined || !email || !password || !confirmpassword || !role || !city || !state || !institution) {
         return res.status(400).json({ error: "Por favor preencha todos os campos obrigatórios" });
     }
 
@@ -122,9 +126,13 @@ router.post("/register", async (req, res) => {
     // Create a new user
     const user = new User({
         name: name,
+        anonymous: anonymous,
         email: email,
         password: passwordHash,
-        role: role
+        role: role,
+        city: city,
+        state: state,
+        institution: institution
     });
 
     try {
@@ -147,7 +155,6 @@ router.post("/register", async (req, res) => {
     } catch (error) {
         res.status(500).json({ error }); // melhorar essa parte depois
     }
-
 });
 
 /**

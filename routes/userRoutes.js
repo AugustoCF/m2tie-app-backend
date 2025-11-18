@@ -56,7 +56,7 @@ const getUserByToken = require('../helpers/get-user-by-token');
  *       500:
  *         description: Erro ao buscar usuários
  */
-// Get all users
+// Get all users - ADMIN ONLY
 router.get("/all", verifyToken, async (req, res) => {
     // Token data
     const token = req.header("auth-token");
@@ -131,9 +131,21 @@ router.get("/all", verifyToken, async (req, res) => {
 // Get an user
 router.get("/:id", verifyToken, async (req, res) => {
 
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    // Request data
     const id = req.params.id;
 
     try {
+        // Verify if requester user exists
+        const requesterUser = await User.findOne({ _id: userId, deleted: false });
+        if (!requesterUser) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
         // Verify if user exists
         const user = await User.findOne({ _id: id, deleted: false }, {  password: 0 });
 
@@ -276,10 +288,14 @@ router.put("/:id", verifyToken, async (req, res) => {
     // Request data
     const userReqId = req.params.id;
     const name = req.body.name;
+    const anonymous = req.body.anonymous;
     const email = req.body.email;
     const password = req.body.password;
     const confirmpassword = req.body.confirmPassword;
     const userReqrole = req.body.role;
+    const city = req.body.city;
+    const state = req.body.state;
+    const institution = req.body.institution;
 
     try {
 
@@ -310,6 +326,10 @@ router.put("/:id", verifyToken, async (req, res) => {
         // Check body content
         if (name) {  
             updateData.name = name;
+        }
+
+        if (typeof anonymous !== "undefined") {
+            updateData.anonymous = anonymous;
         }
 
         if (email) {
@@ -349,6 +369,20 @@ router.put("/:id", verifyToken, async (req, res) => {
             }
 
             updateData.role = userReqrole;
+        }
+
+        // Check other fields
+
+        if (city) {
+            updateData.city = city;
+        }
+
+        if (state) {
+            updateData.state = state;
+        }
+
+        if (institution) {
+            updateData.institution = institution;
         }
 
         // Returns updated data
@@ -416,7 +450,7 @@ router.put("/:id", verifyToken, async (req, res) => {
  *       500:
  *         description: Erro ao deletar usuário
  */
-// Delete an user by ID
+// Delete an user by ID - ADMIN ONLY
 router.delete("/:id", verifyToken, async (req, res) => {
     const id = req.params.id;
     const token = req.header("auth-token");

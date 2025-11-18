@@ -227,7 +227,7 @@ router.get("/all", verifyToken, async (req, res) => {
             })
             .populate({
                 path: 'createdBy',
-                select: 'name email role',
+                select: 'name email role city state institution',
                 match: { deleted: false }
             });
 
@@ -351,7 +351,7 @@ router.get("/active", verifyToken, async (req, res) => {
             })
             .populate({
                 path: 'createdBy',
-                select: 'name email role',
+                select: 'name email role city state institution',
                 match: { deleted: false }
             });
 
@@ -438,7 +438,7 @@ router.get("/:id", verifyToken, async (req, res) => {
             })
             .populate({
                 path: 'createdBy',
-                select: 'name email role',
+                select: 'name email role city state institution',
                 match: { deleted: false }
             });
 

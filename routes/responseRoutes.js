@@ -353,7 +353,7 @@ router.get("/all", verifyToken, async (req, res) => {
             })
             .populate({
                 path: 'userId',
-                select: 'name email',
+                select: 'name email city state institution',
                 match: { deleted: false }
             })
             .populate({
@@ -514,7 +514,7 @@ router.get("/:formId/respondents", verifyToken, async (req, res) => {
         const responses = await Response.find({ formId: formId, deleted: false })
             .populate({
                 path: 'userId',
-                select: 'name email role',
+                select: 'name email role city state institution',
                 match: { deleted: false }
             })
             .sort({ submittedAt: -1 });
@@ -677,7 +677,7 @@ router.get("/:id", verifyToken, async (req, res) => {
             })
             .populate({
                 path: 'userId',
-                select: 'name email',
+                select: 'name email city state institution',
                 match: { deleted: false }
             })
             .populate({

@@ -3,8 +3,6 @@ const router = require('express').Router();
 // Models
 const Question = require('../models/question');
 const User = require('../models/user');
-const Response = require('../models/response');
-const Form = require('../models/form');
 
 // Middlewares
 const verifyToken = require('../helpers/check-token');
@@ -238,7 +236,7 @@ router.get("/all", verifyToken, async (req, res) => {
             .sort({ createdAt: -1 })
             .populate({
                 path: 'createdBy',
-                select: 'name email role',
+                select: 'name email role city state institution',
                 match: { deleted: false }
             });
             
@@ -331,7 +329,7 @@ router.get("/:id", verifyToken, async (req, res) => {
         const question = await Question.findOne({ _id: questionId, deleted: false })
             .populate({
                 path: 'createdBy',
-                select: 'name email role',
+                select: 'name email role city state institution',
                 match: { deleted: false }
             });
 

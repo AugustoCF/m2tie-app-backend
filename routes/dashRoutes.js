@@ -391,7 +391,7 @@ router.get("/full-analysis/:formId", verifyToken, async (req, res) => {
         const responses = await Response.find({ formId, deleted: false })
             .populate({
                 path: 'userId',
-                select: 'name email',
+                select: 'name email city state institution',
                 match: { deleted: false }
             });
 
@@ -605,7 +605,7 @@ router.get("/export/:formId", verifyToken, async (req, res) => {
         const responses = await Response.find({ formId, deleted: false })
             .populate({
                 path: 'userId',
-                select: 'name email',
+                select: 'name email city state institution',
                 match: { deleted: false }
             });
 
@@ -778,7 +778,7 @@ router.get("/:formId", verifyToken, async (req, res) => {
         const responses = await Response.find({ formId, deleted: false })
             .populate({
                 path: 'userId',
-                select: 'name email',
+                select: 'name email city state institution',
                 match: { deleted: false }
             })
             .populate({

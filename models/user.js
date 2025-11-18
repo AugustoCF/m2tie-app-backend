@@ -5,6 +5,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    anonymous: {
+        type: Boolean,
+        required: true,
+        default: false
+    },
     email: {
         type: String,
         required: true,
@@ -19,9 +24,25 @@ const userSchema = new mongoose.Schema({
         enum: ['admin', 'staff', 'user'],
         required: true
     },
+    city: {
+        type: String,
+        required: true
+    },
+    state: {
+        type: String,
+        required: true
+    },
+    institution: {
+        type: String,
+        required: true
+    },
     deleted: {
         type: Boolean,
         default: false
+    },
+    createdAt: {
+        type: Date,
+        default: Date.now
     }
 });
 

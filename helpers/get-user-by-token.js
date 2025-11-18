@@ -14,7 +14,7 @@ const getUserByToken = async (token) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.userId;
 
-    const user = await User.findOne({ _id: userId }, { password: 0 });
+    const user = await User.findOne({ _id: userId, deleted: false }, { password: 0 });
 
     return user;
 };
