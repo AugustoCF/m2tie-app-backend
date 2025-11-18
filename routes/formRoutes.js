@@ -405,7 +405,7 @@ router.get("/active", verifyToken, async (req, res) => {
             });
 
         if (!forms || forms.length === 0) {
-            return res.status(404).json({ error: "Nenhum formulário ativo encontrado para este usuário" });
+            return res.status(200).json({ error: null, msg: "Nenhum formulário ativo encontrado para este usuário", data: [] });
         }
 
         // Para cada formulário, verifica se o usuário já respondeu
