@@ -78,7 +78,37 @@ router.get("/all", verifyToken, async (req, res) => {
         // Get all users
         const users = await User.find({ deleted: false }, {  password: 0 });
 
-        res.json({ error: null, msg: "Usuários encontrados com sucesso", data: users });
+        return res.json({ error: null, msg: "Usuários encontrados com sucesso", data: users });
+        
+    } catch (error) {
+        return res.status(500).json({ error: "Erro ao buscar usuários" });
+    }
+});
+
+// Get all students and teacher respondents - for form assignment - ADMIN ONLY 
+router.get("/assignable", verifyToken, async (req, res) => {
+
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    try {
+
+        // Verify ADMIN role
+        const user = await User.findOne({ _id: userId, deleted: false });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+        if (user.role !== 'admin') {
+            return res.status(401).json({ error: "Acesso negado" });
+        }
+
+        // Get all users
+        const users = await User.find({ deleted: false, role: { $in: ['student', 'teacher_respondent'] } }, {  password: 0 });
+
+        return res.json({ error: null, msg: "Usuários encontrados com sucesso", data: users });
         
     } catch (error) {
         return res.status(500).json({ error: "Erro ao buscar usuários" });
