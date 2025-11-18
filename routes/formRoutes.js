@@ -127,16 +127,11 @@ router.post("/", verifyToken, async (req, res) => {
 
         // Validate fields
         if (!title || title.trim() === '') {
-        return res.status(400).json({ error: "O título é obrigatório" });
+            return res.status(400).json({ error: "O título é obrigatório" });
         }
 
         if (!questions || !Array.isArray(questions) || questions.length === 0) {
             return res.status(400).json({ error: "O formulário deve conter pelo menos uma questão" });
-        }
-
-        // Validate assignedUsers
-        if (!assignedUsers || !Array.isArray(assignedUsers) || assignedUsers.length === 0) {
-            return res.status(400).json({ error: "O formulário deve ter pelo menos um usuário associado" });
         }
 
         // Validate all question IDs
@@ -153,23 +148,24 @@ router.post("/", verifyToken, async (req, res) => {
             return res.status(400).json({ error: "Uma ou mais questões não foram encontradas" });
         }
 
-        // Validate all assignedUsers IDs
-        const invalidUserIds = assignedUsers.filter(id => !mongoose.Types.ObjectId.isValid(id));
-        if (invalidUserIds.length > 0) {
-            return res.status(400).json({ error: "Um ou mais IDs de usuário são inválidos" });
+        // Validate assignedUsers if provided
+        if (assignedUsers && Array.isArray(assignedUsers) && assignedUsers.length > 0) {
+            const invalidUserIds = assignedUsers.filter(id => !mongoose.Types.ObjectId.isValid(id));
+            if (invalidUserIds.length > 0) {
+                return res.status(400).json({ error: "Um ou mais IDs de usuário são inválidos" });
+            }
+
+            const existingUsers = await User.find({ 
+                _id: { $in: assignedUsers }, 
+                deleted: false,
+                role: { $in: ['student', 'teacher_respondent'] } 
+            });
+
+            if (existingUsers.length !== assignedUsers.length) {
+                return res.status(400).json({ error: "Um ou mais usuários não foram encontrados ou não são respondentes" });
+            }
         }
 
-        const existingUsers = await User.find({ 
-            _id: { $in: assignedUsers }, 
-            deleted: false,
-            role: { $in: ['student', 'teacher_respondent'] } 
-        });
-
-        if (existingUsers.length !== assignedUsers.length) {
-            return res.status(400).json({ error: "Um ou mais usuários não foram encontrados ou não são respondentes" });
-        }
-
-        // Deactivate other forms if this one is active
         const formIsActive = isActive !== undefined ? isActive : true;
 
         // Create form object
@@ -181,17 +177,39 @@ router.post("/", verifyToken, async (req, res) => {
                 order: q.order !== undefined ? q.order : index,
                 required: q.required || false
             })),
-            assignedUsers: assignedUsers,
+            assignedUsers: assignedUsers || [], 
             isActive: formIsActive,
             createdBy: user._id.toString()
         });
 
         // Save form
         const newForm = await form.save();
-        return res.status(201).json({ message: "Formulário criado com sucesso!", data: newForm });
+
+        // Populate para retornar dados completos
+        const populatedForm = await Form.findById(newForm._id)
+            .populate({
+                path: 'questions.questionId',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'assignedUsers',
+                select: 'name email role city state institution',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'createdBy',
+                select: 'name email role',
+                match: { deleted: false }
+            });
+
+        return res.status(201).json({ 
+            message: "Formulário criado com sucesso!", 
+            data: populatedForm 
+        });
 
     } catch (error) {
-        return res.status(500).json({ error });
+        console.error('Erro ao criar formulário:', error);
+        return res.status(500).json({ error: "Erro ao criar formulário" });
     }
 
 });
@@ -773,32 +791,34 @@ router.put("/:formId", verifyToken, async (req, res) => {
         // Validate all question IDs exist in database
         if (questions !== undefined) {
             const questionIds = questions.map(q => q.questionId);
-            const existingQuestions = await Question.find({ _id: { $in: questionIds } });
+            const existingQuestions = await Question.find({ _id: { $in: questionIds }, deleted: false });
 
             if (existingQuestions.length !== questionIds.length) {
                 return res.status(404).json({ error: "Uma ou mais questões não foram encontradas" });
             }
         }
 
-        // Validate assignedUsers if provided
-        if (assignedUsers !== undefined) {
-            if (!Array.isArray(assignedUsers) || assignedUsers.length === 0) {
-                return res.status(400).json({ error: "O formulário deve ter pelo menos um usuário associado" });
+        // Validate assignedUsers if provided 
+        if (assignedUsers !== undefined && assignedUsers !== null) {
+            if (!Array.isArray(assignedUsers)) {
+                return res.status(400).json({ error: "assignedUsers deve ser um array" });
             }
 
-            const invalidUserIds = assignedUsers.filter(id => !mongoose.Types.ObjectId.isValid(id));
-            if (invalidUserIds.length > 0) {
-                return res.status(400).json({ error: "Um ou mais IDs de usuário são inválidos" });
-            }
+            if (assignedUsers.length > 0) {
+                const invalidUserIds = assignedUsers.filter(id => !mongoose.Types.ObjectId.isValid(id));
+                if (invalidUserIds.length > 0) {
+                    return res.status(400).json({ error: "Um ou mais IDs de usuário são inválidos" });
+                }
 
-            const existingUsers = await User.find({ 
-                _id: { $in: assignedUsers }, 
-                deleted: false,
-                role: { $in: ['student', 'teacher_respondent'] }
-            });
+                const existingUsers = await User.find({ 
+                    _id: { $in: assignedUsers }, 
+                    deleted: false,
+                    role: { $in: ['student', 'teacher_respondent'] }
+                });
 
-            if (existingUsers.length !== assignedUsers.length) {
-                return res.status(400).json({ error: "Um ou mais usuários não foram encontrados ou não são respondentes" });
+                if (existingUsers.length !== assignedUsers.length) {
+                    return res.status(400).json({ error: "Um ou mais usuários não foram encontrados ou não são respondentes" });
+                }
             }
         }
 
@@ -856,7 +876,11 @@ router.put("/:formId", verifyToken, async (req, res) => {
         return res.status(200).json({ 
             error: null, 
             msg: "Formulário atualizado com sucesso", 
-            data: { ...updatedForm.toObject(), questions: filteredQuestions, assignedUsers: filteredAssignedUsers }
+            data: { 
+                ...updatedForm.toObject(), 
+                questions: filteredQuestions, 
+                assignedUsers: filteredAssignedUsers 
+            }
         });
 
     } catch (error) {

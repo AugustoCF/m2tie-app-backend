@@ -82,7 +82,7 @@ const validateFormUpdate = (updateData, currentForm) => {
     }
 
     // ===================================
-    // 3. ASSIGNED USERS VALIDATION (se fornecido)
+    // 3. ASSIGNED USERS VALIDATION 
     // ===================================
     if (assignedUsers !== undefined) {
         if (!Array.isArray(assignedUsers)) {
@@ -92,39 +92,36 @@ const validateFormUpdate = (updateData, currentForm) => {
             };
         }
 
-        if (assignedUsers.length === 0) {
-            return { 
-                isValid: false, 
-                error: "O formulário deve ter pelo menos um usuário associado" 
-            };
-        }
+        // Permite array vazio - remove a validação de length === 0
 
-        // Validar cada ID de usuário
-        for (let i = 0; i < assignedUsers.length; i++) {
-            const userId = assignedUsers[i];
+        // Validar cada ID de usuário (se houver)
+        if (assignedUsers.length > 0) {
+            for (let i = 0; i < assignedUsers.length; i++) {
+                const userId = assignedUsers[i];
 
-            if (!userId) {
-                return { 
-                    isValid: false, 
-                    error: `Usuário ${i + 1}: o ID do usuário é obrigatório` 
-                };
+                if (!userId) {
+                    return { 
+                        isValid: false, 
+                        error: `Usuário ${i + 1}: o ID do usuário é obrigatório` 
+                    };
+                }
+
+                if (!mongoose.Types.ObjectId.isValid(userId)) {
+                    return { 
+                        isValid: false, 
+                        error: `Usuário ${i + 1}: o ID "${userId}" não é válido` 
+                    };
+                }
             }
 
-            if (!mongoose.Types.ObjectId.isValid(userId)) {
+            // Verificar duplicatas
+            const uniqueUsers = [...new Set(assignedUsers.map(id => id.toString()))];
+            if (uniqueUsers.length !== assignedUsers.length) {
                 return { 
                     isValid: false, 
-                    error: `Usuário ${i + 1}: o ID "${userId}" não é válido` 
+                    error: "A lista de usuários não pode conter IDs duplicados" 
                 };
             }
-        }
-
-        // Verificar duplicatas
-        const uniqueUsers = [...new Set(assignedUsers.map(id => id.toString()))];
-        if (uniqueUsers.length !== assignedUsers.length) {
-            return { 
-                isValid: false, 
-                error: "A lista de usuários não pode conter IDs duplicados" 
-            };
         }
     }
 
