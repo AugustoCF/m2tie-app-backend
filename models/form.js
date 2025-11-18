@@ -19,6 +19,11 @@ const formSchema = new mongoose.Schema({
             default: false 
         }
     }],
+    assignedUsers: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    }],
     isActive: {
         type: Boolean,
         default: true

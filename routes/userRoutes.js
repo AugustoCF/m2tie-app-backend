@@ -197,8 +197,8 @@ router.get("/:id", verifyToken, async (req, res) => {
  *                 example: "novaSenha123"
  *               role:
  *                 type: string
- *                 enum: [user, admin, staff]
- *                 example: "staff"
+ *                 enum: ['admin', 'student', 'teacher_analyst', 'teacher_respondent']
+ *                 example: "teacher_analyst"
  *                 description: "Apenas admin pode alterar role"
  *           examples:
  *             atualizarNome:
@@ -213,7 +213,7 @@ router.get("/:id", verifyToken, async (req, res) => {
  *             atualizarRole:
  *               summary: Atualizar role (apenas admin)
  *               value:
- *                 role: "staff"
+ *                 role: "teacher_analyst"
  *             atualizarCompleto:
  *               summary: Atualização completa
  *               value:
@@ -221,7 +221,7 @@ router.get("/:id", verifyToken, async (req, res) => {
  *                 email: "joao.novo@email.com"
  *                 password: "novaSenha123"
  *                 confirmPassword: "novaSenha123"
- *                 role: "staff"
+ *                 role: "teacher_analyst"
  *     responses:
  *       200:
  *         description: Usuário atualizado com sucesso
@@ -357,7 +357,7 @@ router.put("/:id", verifyToken, async (req, res) => {
         // Check role
         if (userReqrole) {  
 
-            const validRoles = ['user', 'admin', 'staff'];
+            const validRoles = ['admin', 'student', 'teacher_analyst', 'teacher_respondent'];
 
             if (!validRoles.includes(userReqrole)) {
                 return res.status(400).json({ error: "Função inválida. " });

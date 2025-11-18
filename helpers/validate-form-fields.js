@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
  * @returns {Object} { isValid: boolean, error: string|null }
  */
 const validateFormUpdate = (updateData, currentForm) => {
-    const { title, questions, isActive } = updateData;
+    const { title, questions, assignedUsers, isActive } = updateData;
 
     // ===================================
     // 1. TITLE VALIDATION (se fornecido)
@@ -82,7 +82,54 @@ const validateFormUpdate = (updateData, currentForm) => {
     }
 
     // ===================================
-    // 3. ISACTIVE VALIDATION (se fornecido)
+    // 3. ASSIGNED USERS VALIDATION (se fornecido)
+    // ===================================
+    if (assignedUsers !== undefined) {
+        if (!Array.isArray(assignedUsers)) {
+            return { 
+                isValid: false, 
+                error: '"assignedUsers" deve ser um array' 
+            };
+        }
+
+        if (assignedUsers.length === 0) {
+            return { 
+                isValid: false, 
+                error: "O formulário deve ter pelo menos um usuário associado" 
+            };
+        }
+
+        // Validar cada ID de usuário
+        for (let i = 0; i < assignedUsers.length; i++) {
+            const userId = assignedUsers[i];
+
+            if (!userId) {
+                return { 
+                    isValid: false, 
+                    error: `Usuário ${i + 1}: o ID do usuário é obrigatório` 
+                };
+            }
+
+            if (!mongoose.Types.ObjectId.isValid(userId)) {
+                return { 
+                    isValid: false, 
+                    error: `Usuário ${i + 1}: o ID "${userId}" não é válido` 
+                };
+            }
+        }
+
+        // Verificar duplicatas
+        const uniqueUsers = [...new Set(assignedUsers.map(id => id.toString()))];
+        if (uniqueUsers.length !== assignedUsers.length) {
+            return { 
+                isValid: false, 
+                error: "A lista de usuários não pode conter IDs duplicados" 
+            };
+        }
+    }
+
+    // ===================================
+    // 4. ISACTIVE VALIDATION (se fornecido)
     // ===================================
     if (isActive !== undefined && typeof isActive !== 'boolean') {
         return { 

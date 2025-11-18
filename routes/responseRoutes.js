@@ -231,7 +231,7 @@ router.post("/", verifyToken, async (req, res) => {
  * /api/responses/all:
  *   get:
  *     summary: Listar todas as respostas
- *     description: Retorna todas as respostas submetidas no sistema (apenas admin e staff)
+ *     description: Retorna todas as respostas submetidas no sistema (apenas admin e teacher_analyst)
  *     tags: [Respostas]
  *     security:
  *       - bearerAuth: []
@@ -321,7 +321,7 @@ router.post("/", verifyToken, async (req, res) => {
  *       500:
  *         description: Erro interno do servidor
  */
-// Get all responses (admin/staff only)
+// Get all responses (admin/teacher_analyst only)
 router.get("/all", verifyToken, async (req, res) => {
 
     // Token data
@@ -339,8 +339,8 @@ router.get("/all", verifyToken, async (req, res) => {
 
         const role = user.role;
 
-        // Only 'admin' and 'staff' can access all responses
-        if (role !== 'admin' && role !== 'staff') {
+        // Only 'admin' and 'teacher_analyst' can access all responses
+        if (role !== 'admin' && role !== 'teacher_analyst') {
             return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar todas as respostas" });
         }
 
@@ -394,7 +394,7 @@ router.get("/all", verifyToken, async (req, res) => {
  * /api/forms/{id}/respondents:
  *   get:
  *     summary: Listar usuários que responderam o formulário
- *     description: Retorna todos os usuários que já submeteram respostas para este formulário (apenas admin e staff)
+ *     description: Retorna todos os usuários que já submeteram respostas para este formulário (apenas admin e teacher_analyst)
  *     tags: [Formulários]
  *     security:
  *       - bearerAuth: []
@@ -446,7 +446,7 @@ router.get("/all", verifyToken, async (req, res) => {
  *                         example: "joao@email.com"
  *                       role:
  *                         type: string
- *                         enum: [user, admin, staff]
+ *                         enum: ['admin', 'student', 'teacher_analyst', 'teacher_respondent']
  *                         example: "user"
  *                       submittedAt:
  *                         type: string
@@ -498,8 +498,8 @@ router.get("/:formId/respondents", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
-        // Only admin and staff can access
-        if (user.role !== 'admin' && user.role !== 'staff') {
+        // Only admin and teacher_analyst can access
+        if (user.role !== 'admin' && user.role !== 'teacher_analyst') {
             return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar esta informação" });
         }
 
@@ -562,7 +562,7 @@ router.get("/:formId/respondents", verifyToken, async (req, res) => {
  * /api/responses/{id}:
  *   get:
  *     summary: Obter resposta por ID
- *     description: Retorna uma resposta específica com todos os detalhes (apenas admin e staff)
+ *     description: Retorna uma resposta específica com todos os detalhes (apenas admin e teacher_analyst)
  *     tags: [Respostas]
  *     security:
  *       - bearerAuth: []
@@ -644,7 +644,7 @@ router.get("/:formId/respondents", verifyToken, async (req, res) => {
  *       500:
  *         description: Erro interno do servidor
  */
-// Get response by ID (admin/staff only)
+// Get response by ID (admin/teacher_analyst only)
 router.get("/:id", verifyToken, async (req, res) => {
 
     // Token data
@@ -663,8 +663,8 @@ router.get("/:id", verifyToken, async (req, res) => {
         }
         const role = user.role;
 
-        // Only 'admin' and 'staff' can access response by ID
-        if (role !== 'admin' && role !== 'staff') {
+        // Only 'admin' and 'teacher_analyst' can access response by ID
+        if (role !== 'admin' && role !== 'teacher_analyst') {
             return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar respostas específicas" });
         }
 

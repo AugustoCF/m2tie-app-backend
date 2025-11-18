@@ -19,7 +19,7 @@ const validateFormUpdate  = require('../helpers/validate-form-fields');
  * /api/forms:
  *   post:
  *     summary: Criar novo formulário
- *     description: Cria um novo formulário com questões associadas (apenas admin)
+ *     description: Cria um novo formulário com questões e usuários associados (apenas admin)
  *     tags: [Formulários]
  *     security:
  *       - bearerAuth: []
@@ -39,6 +39,9 @@ const validateFormUpdate  = require('../helpers/validate-form-fields');
  *               - questionId: "507f1f77bcf86cd799439012"
  *                 order: 2
  *                 required: false
+ *             assignedUsers:
+ *               - "507f1f77bcf86cd799439021"
+ *               - "507f1f77bcf86cd799439022"
  *             isActive: true
  *     responses:
  *       201:
@@ -66,12 +69,18 @@ const validateFormUpdate  = require('../helpers/validate-form-fields');
  *               questoesObrigatorias:
  *                 value:
  *                   error: "O formulário deve conter pelo menos uma questão"
+ *               usuariosObrigatorios:
+ *                 value:
+ *                   error: "O formulário deve ter pelo menos um usuário associado"
  *               idsInvalidos:
  *                 value:
  *                   error: "Um ou mais IDs de questão são inválidos"
  *               questoesNaoEncontradas:
  *                 value:
  *                   error: "Uma ou mais questões não foram encontradas"
+ *               usuariosInvalidos:
+ *                 value:
+ *                   error: "Um ou mais usuários não foram encontrados ou não são respondentes"
  *       401:
  *         description: Apenas administradores
  *         content:
@@ -101,6 +110,7 @@ router.post("/", verifyToken, async (req, res) => {
     const title = req.body.title;
     const description = req.body.description;
     const questions = req.body.questions;
+    const assignedUsers = req.body.assignedUsers;
     const isActive = req.body.isActive;
 
     // Verify Admin user
@@ -124,6 +134,11 @@ router.post("/", verifyToken, async (req, res) => {
             return res.status(400).json({ error: "O formulário deve conter pelo menos uma questão" });
         }
 
+        // Validate assignedUsers
+        if (!assignedUsers || !Array.isArray(assignedUsers) || assignedUsers.length === 0) {
+            return res.status(400).json({ error: "O formulário deve ter pelo menos um usuário associado" });
+        }
+
         // Validate all question IDs
         const questionIds = questions.map(q => q.questionId);
 
@@ -138,12 +153,24 @@ router.post("/", verifyToken, async (req, res) => {
             return res.status(400).json({ error: "Uma ou mais questões não foram encontradas" });
         }
 
+        // Validate all assignedUsers IDs
+        const invalidUserIds = assignedUsers.filter(id => !mongoose.Types.ObjectId.isValid(id));
+        if (invalidUserIds.length > 0) {
+            return res.status(400).json({ error: "Um ou mais IDs de usuário são inválidos" });
+        }
+
+        const existingUsers = await User.find({ 
+            _id: { $in: assignedUsers }, 
+            deleted: false,
+            role: { $in: ['student', 'teacher_respondent'] } 
+        });
+
+        if (existingUsers.length !== assignedUsers.length) {
+            return res.status(400).json({ error: "Um ou mais usuários não foram encontrados ou não são respondentes" });
+        }
+
         // Deactivate other forms if this one is active
         const formIsActive = isActive !== undefined ? isActive : true;
-
-        if (formIsActive) {
-            await Form.updateMany({},{ isActive: false } );
-        }
 
         // Create form object
         const form = new Form({
@@ -154,6 +181,7 @@ router.post("/", verifyToken, async (req, res) => {
                 order: q.order !== undefined ? q.order : index,
                 required: q.required || false
             })),
+            assignedUsers: assignedUsers,
             isActive: formIsActive,
             createdBy: user._id.toString()
         });
@@ -173,7 +201,7 @@ router.post("/", verifyToken, async (req, res) => {
  * /api/forms/all:
  *   get:
  *     summary: Listar todos os formulários
- *     description: Retorna todos os formulários cadastrados no sistema
+ *     description: Retorna todos os formulários cadastrados no sistema com informações de usuários atribuídos e respostas
  *     tags: [Formulários]
  *     security:
  *       - bearerAuth: []
@@ -226,6 +254,11 @@ router.get("/all", verifyToken, async (req, res) => {
                 match: { deleted: false }
             })
             .populate({
+                path: 'assignedUsers',
+                select: 'name email role city state institution',
+                match: { deleted: false }
+            })
+            .populate({
                 path: 'createdBy',
                 select: 'name email role city state institution',
                 match: { deleted: false }
@@ -243,11 +276,14 @@ router.get("/all", verifyToken, async (req, res) => {
             const validResponsesCount = responses.filter(r => r.userId !== null).length;
 
             const filteredQuestions = form.questions.filter(q => q.questionId !== null);
+            const filteredAssignedUsers = form.assignedUsers.filter(u => u !== null);
 
             return {
                 ...form.toObject(),
                 questions: filteredQuestions,
-                totalResponses: validResponsesCount
+                assignedUsers: filteredAssignedUsers,
+                totalResponses: validResponsesCount,
+                totalAssigned: filteredAssignedUsers.length
             };
         }));
 
@@ -266,14 +302,14 @@ router.get("/all", verifyToken, async (req, res) => {
  * @swagger
  * /api/forms/active:
  *   get:
- *     summary: Obter formulário ativo
- *     description: Retorna o formulário atualmente ativo para resposta. Verifica se o usuário já respondeu.
+ *     summary: Obter formulários ativos do usuário logado
+ *     description: Retorna todos os formulários ativos que foram atribuídos ao usuário logado, indicando quais já foram respondidos
  *     tags: [Formulários]
  *     security:
  *       - bearerAuth: []
  *     responses:
  *       200:
- *         description: Formulário ativo encontrado
+ *         description: Formulários ativos encontrados
  *         content:
  *           application/json:
  *             schema:
@@ -282,41 +318,47 @@ router.get("/all", verifyToken, async (req, res) => {
  *                 error:
  *                   type: string
  *                   nullable: true
+ *                   example: null
  *                 msg:
  *                   type: string
+ *                   example: "Formulários ativos encontrados com sucesso"
  *                 data:
- *                   oneOf:
- *                     - $ref: '#/components/schemas/Form'
- *                     - type: object
- *                       properties:
- *                         formTitle:
- *                           type: string
- *                         submittedAt:
- *                           type: string
- *                           format: date-time
- *                         responseId:
- *                           type: string
- *             examples:
- *               formularioDisponivel:
- *                 value:
- *                   error: null
- *                   msg: "Formulário ativo encontrado com sucesso"
- *                   data:
- *                     _id: "507f1f77bcf86cd799439013"
- *                     title: "Pesquisa de Satisfação"
- *                     description: "Avalie nosso serviço"
- *                     questions: []
- *                     isActive: true
- *               jaRespondido:
- *                 value:
- *                   error: null
- *                   msg: "Formulário já respondido"
- *                   data:
- *                     formTitle: "Pesquisa de Satisfação"
- *                     submittedAt: "2025-11-16T10:30:00.000Z"
- *                     responseId: "507f1f77bcf86cd799439015"
+ *                   type: array
+ *                   items:
+ *                     allOf:
+ *                       - $ref: '#/components/schemas/Form'
+ *                       - type: object
+ *                         properties:
+ *                           hasResponded:
+ *                             type: boolean
+ *                             description: Se o usuário já respondeu este formulário
+ *                           responseId:
+ *                             type: string
+ *                             format: objectId
+ *                             nullable: true
+ *                           submittedAt:
+ *                             type: string
+ *                             format: date-time
+ *                             nullable: true
+ *             example:
+ *               error: null
+ *               msg: "Formulários ativos encontrados com sucesso"
+ *               data:
+ *                 - _id: "507f1f77bcf86cd799439013"
+ *                   title: "Pesquisa de Satisfação"
+ *                   description: "Avalie nosso serviço"
+ *                   questions: []
+ *                   isActive: true
+ *                   hasResponded: false
+ *                   responseId: null
+ *                   submittedAt: null
+ *                 - _id: "507f1f77bcf86cd799439014"
+ *                   title: "Avaliação de Curso"
+ *                   hasResponded: true
+ *                   responseId: "507f1f77bcf86cd799439030"
+ *                   submittedAt: "2025-11-16T10:30:00.000Z"
  *       404:
- *         description: Formulário ativo não encontrado ou usuário não encontrado
+ *         description: Usuário não encontrado ou nenhum formulário ativo
  *         content:
  *           application/json:
  *             schema:
@@ -325,14 +367,16 @@ router.get("/all", verifyToken, async (req, res) => {
  *               usuarioNaoEncontrado:
  *                 value:
  *                   error: "Usuário não encontrado"
- *               formularioNaoEncontrado:
+ *               nenhumFormulario:
  *                 value:
- *                   error: "Formulário ativo não encontrado"
+ *                   error: "Nenhum formulário ativo encontrado para este usuário"
  *       500:
  *         description: Erro interno do servidor
  */
 // Get Active Form
 router.get("/active", verifyToken, async (req, res) => {
+
+    // Token data
     const token = req.header("auth-token");
     const userByToken = await getUserByToken(token);
     const userId = userByToken._id.toString();
@@ -344,7 +388,12 @@ router.get("/active", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
-        const form = await Form.findOne({ isActive: true, deleted: false })
+        const forms = await Form.find({ 
+            assignedUsers: userId,
+            isActive: true,
+            deleted: false 
+        })
+            .sort({ createdAt: -1 })
             .populate({
                 path: 'questions.questionId',
                 match: { deleted: false }
@@ -355,39 +404,56 @@ router.get("/active", verifyToken, async (req, res) => {
                 match: { deleted: false }
             });
 
-        if (!form) {
-            return res.status(404).json({ error: "Formulário ativo não encontrado" });
+        if (!forms || forms.length === 0) {
+            return res.status(404).json({ error: "Nenhum formulário ativo encontrado para este usuário" });
         }
 
-        // Filtra as questões para remover as que têm questionId null
-        const filteredQuestions = form.questions.filter(q => q.questionId !== null);
+        // Para cada formulário, verifica se o usuário já respondeu
+        const formsWithStatus = await Promise.all(forms.map(async form => {
+            const response = await Response.findOne({
+                formId: form._id,
+                userId: userId,
+                deleted: false
+            });
+
+            const filteredQuestions = form.questions.filter(q => q.questionId !== null);
+
+            return {
+                ...form.toObject(),
+                questions: filteredQuestions,
+                hasResponded: !!response,
+                responseId: response?._id,
+                submittedAt: response?.createdAt
+            };
+        }));
 
         return res.status(200).json({ 
             error: null, 
-            msg: "Formulário ativo encontrado com sucesso", 
-            data: { ...form.toObject(), questions: filteredQuestions }
+            msg: "Formulários ativos encontrados com sucesso", 
+            data: formsWithStatus
         });
 
     } catch (error) {
-        return res.status(500).json({ error });
+        return res.status(500).json({ error: "Erro ao buscar formulários ativos" });
     }
 });
 
 /**
  * @swagger
- * /api/forms/{id}:
+ * /api/forms/{formId}:
  *   get:
- *     summary: Obter formulário por ID
- *     description: Retorna um formulário específico com todas as suas questões
+ *     summary: Obter formulário por ID (Admin/Analista apenas)
+ *     description: Retorna um formulário específico com todas as informações. Acesso restrito a admins e analistas.
  *     tags: [Formulários]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: formId
  *         required: true
  *         schema:
  *           type: string
+ *           format: objectId
  *         description: ID do formulário
  *         example: "507f1f77bcf86cd799439013"
  *     responses:
@@ -407,6 +473,14 @@ router.get("/active", verifyToken, async (req, res) => {
  *                   example: "Formulário encontrado com sucesso"
  *                 data:
  *                   $ref: '#/components/schemas/Form'
+ *       403:
+ *         description: Acesso negado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Acesso negado ao formulário"
  *       404:
  *         description: Formulário ou usuário não encontrado
  *         content:
@@ -416,9 +490,9 @@ router.get("/active", verifyToken, async (req, res) => {
  *       500:
  *         description: Erro interno do servidor
  */
-// Get a Form by ID
-router.get("/:id", verifyToken, async (req, res) => {
-    const formId = req.params.id;
+// Get a Form by ID - ADMIN AND TEACHER_ANALYST ONLY
+router.get("/:formId", verifyToken, async (req, res) => {
+    const formId = req.params.formId;
 
     const token = req.header("auth-token");
     const userByToken = await getUserByToken(token);
@@ -431,9 +505,19 @@ router.get("/:id", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
+        const role = user.role;
+        if (role !== 'admin' && role !== 'teacher_analyst') {
+            return res.status(403).json({ error: "Acesso negado ao formulário" });
+        }
+
         const form = await Form.findOne({ _id: formId, deleted: false })
             .populate({
                 path: 'questions.questionId',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'assignedUsers',
+                select: 'name email role city state institution',
                 match: { deleted: false }
             })
             .populate({
@@ -448,12 +532,13 @@ router.get("/:id", verifyToken, async (req, res) => {
 
         // Filtra as questões para remover as que têm questionId null
         const filteredQuestions = form.questions.filter(q => q.questionId !== null);
+        const filteredAssignedUsers = form.assignedUsers.filter(u => u !== null);
 
         // Retorna o formulário com as questões filtradas
         return res.status(200).json({ 
             error: null, 
             msg: "Formulário encontrado com sucesso", 
-            data: { ...form.toObject(), questions: filteredQuestions }
+            data: { ...form.toObject(), questions: filteredQuestions, assignedUsers: filteredAssignedUsers }
         });
 
     } catch (error) {
@@ -463,19 +548,20 @@ router.get("/:id", verifyToken, async (req, res) => {
 
 /**
  * @swagger
- * /api/forms/{id}:
+ * /api/forms/{formId}:
  *   delete:
- *     summary: Deletar formulário
- *     description: Remove um formulário do sistema (apenas admin)
+ *     summary: Deletar formulário (Admin apenas)
+ *     description: Remove um formulário do sistema (soft delete). Apenas administradores.
  *     tags: [Formulários]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: formId
  *         required: true
  *         schema:
  *           type: string
+ *           format: objectId
  *         description: ID do formulário
  *         example: "507f1f77bcf86cd799439013"
  *     responses:
@@ -511,8 +597,8 @@ router.get("/:id", verifyToken, async (req, res) => {
  *         description: Erro interno do servidor
  */
 // Delete a Form by ID
-router.delete("/:id", verifyToken, async (req, res) => {
-    const formId = req.params.id;
+router.delete("/:formId", verifyToken, async (req, res) => {
+    const formId = req.params.formId;
 
     const token = req.header("auth-token");
     const userByToken = await getUserByToken(token);
@@ -529,7 +615,6 @@ router.delete("/:id", verifyToken, async (req, res) => {
             return res.status(401).json({ error: "Apenas administradores podem deletar formulários." });
         }
 
-        // Soft delete: set deleted flag to true
         const updatedForm = await Form.findByIdAndUpdate(
             formId,
             { $set: { deleted: true } },
@@ -543,25 +628,27 @@ router.delete("/:id", verifyToken, async (req, res) => {
         return res.status(200).json({ error: null, msg: "Formulário deletado com sucesso" });
 
     } catch (error) {
-        return res.status(500).json({ error });
+        console.error('Erro ao deletar formulário:', error);
+        return res.status(500).json({ error: "Erro ao deletar formulário" });
     }
 });
 
 /**
  * @swagger
- * /api/forms/{id}:
+ * /api/forms/{formId}:
  *   put:
- *     summary: Atualizar formulário
- *     description: Atualiza informações de um formulário existente (apenas admin)
+ *     summary: Atualizar formulário (Admin apenas)
+ *     description: Atualiza informações de um formulário existente, incluindo usuários atribuídos. Apenas administradores.
  *     tags: [Formulários]
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
- *         name: id
+ *         name: formId
  *         required: true
  *         schema:
  *           type: string
+ *           format: objectId
  *         description: ID do formulário
  *         example: "507f1f77bcf86cd799439013"
  *     requestBody:
@@ -573,6 +660,8 @@ router.delete("/:id", verifyToken, async (req, res) => {
  *             properties:
  *               title:
  *                 type: string
+ *                 minLength: 3
+ *                 maxLength: 200
  *                 example: "Pesquisa de Satisfação 2025 - Atualizada"
  *               description:
  *                 type: string
@@ -584,10 +673,19 @@ router.delete("/:id", verifyToken, async (req, res) => {
  *                   properties:
  *                     questionId:
  *                       type: string
+ *                       format: objectId
  *                     order:
- *                       type: number
+ *                       type: integer
+ *                       minimum: 0
  *                     required:
  *                       type: boolean
+ *               assignedUsers:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: string
+ *                   format: objectId
+ *                 example: ["507f1f77bcf86cd799439021", "507f1f77bcf86cd799439023"]
  *               isActive:
  *                 type: boolean
  *                 example: true
@@ -614,6 +712,13 @@ router.delete("/:id", verifyToken, async (req, res) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               tituloInvalido:
+ *                 value:
+ *                   error: "O título do formulário deve ter no mínimo 3 caracteres"
+ *               usuariosVazio:
+ *                 value:
+ *                   error: "O formulário deve ter pelo menos um usuário associado"
  *       401:
  *         description: Apenas administradores
  *         content:
@@ -621,7 +726,7 @@ router.delete("/:id", verifyToken, async (req, res) => {
  *             schema:
  *               $ref: '#/components/schemas/Error'
  *       404:
- *         description: Formulário ou questões não encontradas
+ *         description: Formulário, questões ou usuários não encontrados
  *         content:
  *           application/json:
  *             schema:
@@ -630,15 +735,15 @@ router.delete("/:id", verifyToken, async (req, res) => {
  *         description: Erro interno do servidor
  */
 // Update a Form by ID
-router.put("/:id", verifyToken, async (req, res) => {
+router.put("/:formId", verifyToken, async (req, res) => {
 
-    const formId = req.params.id;
+    const formId = req.params.formId;
 
     const token = req.header("auth-token");
     const userByToken = await getUserByToken(token);
     const userId = userByToken._id.toString();
 
-    const { title, description, questions, isActive } = req.body;
+    const { title, description, questions, assignedUsers, isActive } = req.body;
 
     try {
 
@@ -659,7 +764,7 @@ router.put("/:id", verifyToken, async (req, res) => {
         }
 
         // Validate update data
-        const validationResult = validateFormUpdate({ title, description, questions, isActive }, form);
+        const validationResult = validateFormUpdate({ title, description, questions, assignedUsers, isActive }, form);
         
         if (!validationResult.isValid) {
             return res.status(400).json({ error: validationResult.error });
@@ -675,11 +780,26 @@ router.put("/:id", verifyToken, async (req, res) => {
             }
         }
 
-        // Deactivate other forms if this one is being activated
-        const formIsActive = isActive !== undefined ? isActive : form.isActive;
+        // Validate assignedUsers if provided
+        if (assignedUsers !== undefined) {
+            if (!Array.isArray(assignedUsers) || assignedUsers.length === 0) {
+                return res.status(400).json({ error: "O formulário deve ter pelo menos um usuário associado" });
+            }
 
-        if (formIsActive) {
-            await Form.updateMany({ _id: { $ne: formId } }, { isActive: false });
+            const invalidUserIds = assignedUsers.filter(id => !mongoose.Types.ObjectId.isValid(id));
+            if (invalidUserIds.length > 0) {
+                return res.status(400).json({ error: "Um ou mais IDs de usuário são inválidos" });
+            }
+
+            const existingUsers = await User.find({ 
+                _id: { $in: assignedUsers }, 
+                deleted: false,
+                role: { $in: ['student', 'teacher_respondent'] }
+            });
+
+            if (existingUsers.length !== assignedUsers.length) {
+                return res.status(400).json({ error: "Um ou mais usuários não foram encontrados ou não são respondentes" });
+            }
         }
 
         // Build updated form object
@@ -701,6 +821,10 @@ router.put("/:id", verifyToken, async (req, res) => {
             }));
         }
 
+        if (assignedUsers !== undefined) {
+            updateData.assignedUsers = assignedUsers;
+        }
+
         if (isActive !== undefined) {
             updateData.isActive = isActive;
         }
@@ -710,17 +834,29 @@ router.put("/:id", verifyToken, async (req, res) => {
             { _id: formId }, 
             { $set: updateData }, 
             { new: true }
-        ).populate({
+        )
+        .populate({
             path: 'questions.questionId',
+            match: { deleted: false }
+        })
+        .populate({
+            path: 'assignedUsers',
+            select: 'name email role city state institution',
+            match: { deleted: false }
+        })
+        .populate({
+            path: 'createdBy',
+            select: 'name email role',
             match: { deleted: false }
         });
 
         const filteredQuestions = updatedForm.questions.filter(q => q.questionId !== null);
+        const filteredAssignedUsers = updatedForm.assignedUsers.filter(u => u !== null);
 
         return res.status(200).json({ 
             error: null, 
             msg: "Formulário atualizado com sucesso", 
-            data: { ...updatedForm.toObject(), questions: filteredQuestions }
+            data: { ...updatedForm.toObject(), questions: filteredQuestions, assignedUsers: filteredAssignedUsers }
         });
 
     } catch (error) {

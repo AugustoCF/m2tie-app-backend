@@ -23,7 +23,7 @@ const User = require('../models/user');
  *             email: "joao@email.com"
  *             password: "senha123"
  *             confirmpassword: "senha123"
- *             role: "user"
+ *             role: "student"
  *     responses:
  *       200:
  *         description: Usuário registrado com sucesso
@@ -107,7 +107,7 @@ router.post("/register", async (req, res) => {
     }
 
     // Check if role is valid
-    const validRoles = ['admin', 'staff', 'user'];
+    const validRoles = ['admin', 'student', 'teacher_analyst', 'teacher_respondent'];
     if (!validRoles.includes(role)) {
         return res.status(400).json({ error: "Função inválida" });
     }

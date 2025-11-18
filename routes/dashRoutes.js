@@ -17,7 +17,7 @@ const getUserByToken = require('../helpers/get-user-by-token');
  * /api/dashboards/analysis/{formId}/{questionId}:
  *   get:
  *     summary: Análise de uma questão específica
- *     description: Retorna estatísticas detalhadas de uma questão do formulário (apenas admin e staff)
+ *     description: Retorna estatísticas detalhadas de uma questão do formulário (apenas admin e teacher_analyst)
  *     tags: [Dashboards]
  *     security:
  *       - bearerAuth: []
@@ -84,7 +84,7 @@ const getUserByToken = require('../helpers/get-user-by-token');
  *                           type: number
  *                           example: 150
  *       403:
- *         description: Acesso negado - apenas admin e staff
+ *         description: Acesso negado - apenas admin e teacher_analyst
  *         content:
  *           application/json:
  *             schema:
@@ -143,7 +143,7 @@ router.get("/analysis/:formId/:questionId", verifyToken, async (req, res) => {
         }
 
         const role = user.role;
-        if (role !== 'admin' && role !== 'staff') {
+        if (role !== 'admin' && role !== 'teacher_analyst') {
             return res.status(403).json({ error: "Acesso negado." });
         }
 
@@ -259,7 +259,7 @@ router.get("/analysis/:formId/:questionId", verifyToken, async (req, res) => {
  * /api/dashboards/full-analysis/{formId}:
  *   get:
  *     summary: Análise completa do formulário
- *     description: Retorna análise estatística de todas as questões do formulário (apenas admin e staff)
+ *     description: Retorna análise estatística de todas as questões do formulário (apenas admin e teacher_analyst)
  *     tags: [Dashboards]
  *     security:
  *       - bearerAuth: []
@@ -373,7 +373,7 @@ router.get("/full-analysis/:formId", verifyToken, async (req, res) => {
         }
 
         const role = user.role;
-        if (role !== 'admin' && role !== 'staff') {
+        if (role !== 'admin' && role !== 'teacher_analyst') {
             return res.status(403).json({ error: "Acesso negado." });
         }
 
@@ -501,7 +501,7 @@ router.get("/full-analysis/:formId", verifyToken, async (req, res) => {
  * /api/dashboards/export/{formId}:
  *   get:
  *     summary: Exportar dados do formulário
- *     description: Retorna dados em formato tabular para exportação (CSV/Excel) - apenas admin e staff
+ *     description: Retorna dados em formato tabular para exportação (CSV/Excel) - apenas admin e teacher_analyst
  *     tags: [Dashboards]
  *     security:
  *       - bearerAuth: []
@@ -587,7 +587,7 @@ router.get("/export/:formId", verifyToken, async (req, res) => {
         }
 
         const role = user.role;
-        if (role !== 'admin' && role !== 'staff') {
+        if (role !== 'admin' && role !== 'teacher_analyst') {
             return res.status(403).json({ error: "Acesso negado." });
         }
 
@@ -654,7 +654,7 @@ router.get("/export/:formId", verifyToken, async (req, res) => {
  * /api/dashboards/{formId}:
  *   get:
  *     summary: Obter todas as respostas brutas
- *     description: Retorna todas as respostas do formulário sem processamento estatístico (apenas admin e staff)
+ *     description: Retorna todas as respostas do formulário sem processamento estatístico (apenas admin e teacher_analyst)
  *     tags: [Dashboards]
  *     security:
  *       - bearerAuth: []
@@ -763,7 +763,7 @@ router.get("/:formId", verifyToken, async (req, res) => {
         }
 
         const role = user.role;
-        if (role !== 'admin' && role !== 'staff') {
+        if (role !== 'admin' && role !== 'teacher_analyst') {
             return res.status(403).json({ error: "Acesso negado." });
         }
 

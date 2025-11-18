@@ -55,9 +55,9 @@ const swaggerOptions = {
                         },
                         role: {
                             type: 'string',
-                            enum: ['admin', 'staff', 'user'],
+                            enum: ['admin', 'student', 'teacher_analyst', 'teacher_respondent'],
                             description: 'Nível de acesso',
-                            example: 'user'
+                            example: 'admin'
                         }
                     }
                 },

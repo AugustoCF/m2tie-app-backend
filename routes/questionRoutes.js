@@ -173,7 +173,7 @@ router.post("/", verifyToken, async (req, res) => {
  * /api/questions/all:
  *   get:
  *     summary: Listar todas as questões
- *     description: Retorna todas as questões cadastradas no sistema (apenas admin e staff)
+ *     description: Retorna todas as questões cadastradas no sistema (apenas admin e teacher_analyst)
  *     tags: [Questões]
  *     security:
  *       - bearerAuth: []
@@ -213,7 +213,7 @@ router.post("/", verifyToken, async (req, res) => {
  *       500:
  *         description: Erro interno do servidor
  */
-// Get all Questions for staff and admin
+// Get all Questions for teacher_analyst and admin
 router.get("/all", verifyToken, async (req, res) => {
     try {
 
@@ -228,7 +228,7 @@ router.get("/all", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
-        if (user.role !== 'admin' && user.role !== 'staff') {
+        if (user.role !== 'admin' && user.role !== 'teacher_analyst') {
             return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar as questões" });
         }
         
@@ -253,7 +253,7 @@ router.get("/all", verifyToken, async (req, res) => {
  * /api/questions/{id}:
  *   get:
  *     summary: Obter questão por ID
- *     description: Retorna uma questão específica (apenas admin e staff)
+ *     description: Retorna uma questão específica (apenas admin e teacher_analyst)
  *     tags: [Questões]
  *     security:
  *       - bearerAuth: []
@@ -320,7 +320,7 @@ router.get("/:id", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
-        if (user.role !== 'admin' && user.role !== 'staff') {
+        if (user.role !== 'admin' && user.role !== 'teacher_analyst') {
             return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar as questões" });
         }
 
