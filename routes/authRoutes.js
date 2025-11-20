@@ -146,14 +146,14 @@ router.post("/register", async (req, res) => {
                 userId: newUser._id,
                 role: newUser.role
             },
-            process.env.JWT_SECRET // melhorar essa parte depoisx
+            process.env.JWT_SECRET 
         );
 
         // Return token
         res.json({ error: null, msg: "Registro realizado com sucesso", token: token, userId: newUser._id });
 
     } catch (error) {
-        res.status(500).json({ error }); // melhorar essa parte depois
+        res.status(500).json({ error }); 
     }
 });
 

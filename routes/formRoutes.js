@@ -185,7 +185,7 @@ router.post("/", verifyToken, async (req, res) => {
         // Save form
         const newForm = await form.save();
 
-        // Populate para retornar dados completos
+        // Populate to return complete data
         const populatedForm = await Form.findById(newForm._id)
             .populate({
                 path: 'questions.questionId',
@@ -214,107 +214,6 @@ router.post("/", verifyToken, async (req, res) => {
 
 });
 
-/**
- * @swagger
- * /api/forms/all:
- *   get:
- *     summary: Listar todos os formulários
- *     description: Retorna todos os formulários cadastrados no sistema com informações de usuários atribuídos e respostas
- *     tags: [Formulários]
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Formulários encontrados com sucesso
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 error:
- *                   type: string
- *                   nullable: true
- *                   example: null
- *                 msg:
- *                   type: string
- *                   example: "Formulários encontrados com sucesso"
- *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/Form'
- *       404:
- *         description: Usuário não encontrado
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       500:
- *         description: Erro interno do servidor
- */
-// Get all Forms
-router.get("/all", verifyToken, async (req, res) => {
-
-    const token = req.header("auth-token");
-    const userByToken = await getUserByToken(token);
-    const userId = userByToken._id.toString();
-
-    try {
-        const user = await User.findOne({ _id: userId, deleted: false });
-
-        if (!user) {
-            return res.status(404).json({ error: "Usuário não encontrado" });
-        }
-
-        const forms = await Form.find({ deleted: false })
-            .sort({ createdAt: -1 })
-            .populate({
-                path: 'questions.questionId',
-                match: { deleted: false }
-            })
-            .populate({
-                path: 'assignedUsers',
-                select: 'name email role city state institution',
-                match: { deleted: false }
-            })
-            .populate({
-                path: 'createdBy',
-                select: 'name email role city state institution',
-                match: { deleted: false }
-            });
-
-        // Para cada formulário, conte as respostas válidas
-        const formsWithResponseCount = await Promise.all(forms.map(async form => {
-            const responses = await Response.find({
-                formId: form._id,
-                deleted: false
-            }).populate({
-                path: 'userId',
-                match: { deleted: false }
-            });
-            const validResponsesCount = responses.filter(r => r.userId !== null).length;
-
-            const filteredQuestions = form.questions.filter(q => q.questionId !== null);
-            const filteredAssignedUsers = form.assignedUsers.filter(u => u !== null);
-
-            return {
-                ...form.toObject(),
-                questions: filteredQuestions,
-                assignedUsers: filteredAssignedUsers,
-                totalResponses: validResponsesCount,
-                totalAssigned: filteredAssignedUsers.length
-            };
-        }));
-
-        return res.status(200).json({ 
-            error: null, 
-            msg: "Formulários encontrados com sucesso", 
-            data: formsWithResponseCount 
-        });
-
-    } catch (error) {
-        return res.status(500).json({ error });
-    }
-});
 
 /**
  * @swagger
@@ -426,7 +325,7 @@ router.get("/active", verifyToken, async (req, res) => {
             return res.status(200).json({ error: null, msg: "Nenhum formulário ativo encontrado para este usuário", data: [] });
         }
 
-        // Para cada formulário, verifica se o usuário já respondeu
+        // For each form, check if the user has already responded
         const formsWithStatus = await Promise.all(forms.map(async form => {
             const response = await Response.findOne({
                 formId: form._id,
@@ -453,6 +352,112 @@ router.get("/active", verifyToken, async (req, res) => {
 
     } catch (error) {
         return res.status(500).json({ error: "Erro ao buscar formulários ativos" });
+    }
+});
+
+/**
+ * @swagger
+ * /api/forms/all:
+ *   get:
+ *     summary: Listar todos os formulários
+ *     description: Retorna todos os formulários cadastrados no sistema com informações de usuários atribuídos e respostas
+ *     tags: [Formulários]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Formulários encontrados com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Formulários encontrados com sucesso"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Form'
+ *       404:
+ *         description: Usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro interno do servidor
+ */
+// Get all Forms
+router.get("/admins/all", verifyToken, async (req, res) => {
+
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    try {
+        const user = await User.findOne({ _id: userId, deleted: false });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        if (user.role !== 'admin') {
+            return res.status(401).json({ error: "Apenas administradores podem acessar todos os formulários." });
+        }
+
+        const forms = await Form.find({ deleted: false })
+            .sort({ createdAt: -1 })
+            .populate({
+                path: 'questions.questionId',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'assignedUsers',
+                select: 'name email role city state institution',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'createdBy',
+                select: 'name email role city state institution',
+                match: { deleted: false }
+            });
+
+        // For each form, count valid responses
+        const formsWithResponseCount = await Promise.all(forms.map(async form => {
+            const responses = await Response.find({
+                formId: form._id,
+                deleted: false
+            }).populate({
+                path: 'userId',
+                match: { deleted: false }
+            });
+            const validResponsesCount = responses.filter(r => r.userId !== null).length;
+
+            const filteredQuestions = form.questions.filter(q => q.questionId !== null);
+            const filteredAssignedUsers = form.assignedUsers.filter(u => u !== null);
+
+            return {
+                ...form.toObject(),
+                questions: filteredQuestions,
+                assignedUsers: filteredAssignedUsers,
+                totalResponses: validResponsesCount,
+                totalAssigned: filteredAssignedUsers.length
+            };
+        }));
+
+        return res.status(200).json({ 
+            error: null, 
+            msg: "Formulários encontrados com sucesso", 
+            data: formsWithResponseCount 
+        });
+
+    } catch (error) {
+        return res.status(500).json({ error });
     }
 });
 
@@ -508,8 +513,8 @@ router.get("/active", verifyToken, async (req, res) => {
  *       500:
  *         description: Erro interno do servidor
  */
-// Get a Form by ID - ADMIN AND TEACHER_ANALYST ONLY
-router.get("/:formId", verifyToken, async (req, res) => {
+// Get a Form by ID - (ADMIN)
+router.get("/admins/:formId", verifyToken, async (req, res) => {
     const formId = req.params.formId;
 
     const token = req.header("auth-token");
@@ -524,7 +529,7 @@ router.get("/:formId", verifyToken, async (req, res) => {
         }
 
         const role = user.role;
-        if (role !== 'admin' && role !== 'teacher_analyst') {
+        if (role !== 'admin') {
             return res.status(403).json({ error: "Acesso negado ao formulário" });
         }
 
@@ -548,11 +553,248 @@ router.get("/:formId", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Formulário não encontrado" });
         }
 
-        // Filtra as questões para remover as que têm questionId null
+        // Filter questions to remove those with null questionId
         const filteredQuestions = form.questions.filter(q => q.questionId !== null);
         const filteredAssignedUsers = form.assignedUsers.filter(u => u !== null);
 
-        // Retorna o formulário com as questões filtradas
+        // Return the form with filtered questions
+        return res.status(200).json({ 
+            error: null, 
+            msg: "Formulário encontrado com sucesso", 
+            data: { ...form.toObject(), questions: filteredQuestions, assignedUsers: filteredAssignedUsers }
+        });
+
+    } catch (error) {
+        return res.status(500).json({ error });
+    }
+});
+
+/**
+ * @swagger
+ * /api/forms/all:
+ *   get:
+ *     summary: Listar todos os formulários
+ *     description: Retorna todos os formulários cadastrados no sistema com informações de usuários atribuídos e respostas
+ *     tags: [Formulários]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Formulários encontrados com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Formulários encontrados com sucesso"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/Form'
+ *       404:
+ *         description: Usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro interno do servidor
+ */
+// Get all Forms (ANALYST)
+router.get("/analysts/all", verifyToken, async (req, res) => {
+
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    try {
+        const user = await User.findOne({ _id: userId, deleted: false });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+        if (user.role !== 'teacher_analyst') {
+            return res.status(401).json({ error: "Apenas analistas podem acessar todos os formulários." });
+        }
+
+        const forms = await Form.find({ deleted: false })
+            .sort({ createdAt: -1 })
+            .populate({
+                path: 'questions.questionId',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'assignedUsers',
+                select: 'name email role city state institution anonymous',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'createdBy',
+                select: 'name email role city state institution',
+                match: { deleted: false }
+            });
+
+        // For each form, count valid responses
+        const formsWithResponseCount = await Promise.all(forms.map(async form => {
+            const responses = await Response.find({
+                formId: form._id,
+                deleted: false
+            }).populate({
+                path: 'userId',
+                match: { deleted: false }
+            });
+            const validResponsesCount = responses.filter(r => r.userId !== null).length;
+
+            const filteredQuestions = form.questions.filter(q => q.questionId !== null);
+
+            // Anonymity handling for assignedUsers
+            const filteredAssignedUsers = form.assignedUsers
+                .filter(u => u !== null)
+                .map(u => {
+                    if (u.anonymous === true) {
+                        return { _id: u._id };
+                    }
+                    const userObj = u.toObject ? u.toObject() : u;
+                    delete userObj.anonymous;
+                    return userObj;
+                });
+
+            return {
+                ...form.toObject(),
+                questions: filteredQuestions,
+                assignedUsers: filteredAssignedUsers,
+                totalResponses: validResponsesCount,
+                totalAssigned: filteredAssignedUsers.length
+            };
+        }));
+
+        return res.status(200).json({ 
+            error: null, 
+            msg: "Formulários encontrados com sucesso", 
+            data: formsWithResponseCount 
+        });
+
+    } catch (error) {
+        return res.status(500).json({ error });
+    }
+});
+
+/**
+ * @swagger
+ * /api/forms/{formId}:
+ *   get:
+ *     summary: Obter formulário por ID (Admin/Analista apenas)
+ *     description: Retorna um formulário específico com todas as informações. Acesso restrito a admins e analistas.
+ *     tags: [Formulários]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: formId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: objectId
+ *         description: ID do formulário
+ *         example: "507f1f77bcf86cd799439013"
+ *     responses:
+ *       200:
+ *         description: Formulário encontrado com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Formulário encontrado com sucesso"
+ *                 data:
+ *                   $ref: '#/components/schemas/Form'
+ *       403:
+ *         description: Acesso negado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Acesso negado ao formulário"
+ *       404:
+ *         description: Formulário ou usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro interno do servidor
+ */
+// Get a Form by ID - (ADMIN)
+router.get("/analysts/:formId", verifyToken, async (req, res) => {
+    const formId = req.params.formId;
+
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    try {
+        const user = await User.findOne({ _id: userId, deleted: false });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        const role = user.role;
+        if (role !== 'teacher_analyst') {
+            return res.status(403).json({ error: "Acesso negado ao formulário" });
+        }
+
+        const form = await Form.findOne({ _id: formId, deleted: false })
+            .populate({
+                path: 'questions.questionId',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'assignedUsers',
+                select: 'name email role city state institution anonymous',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'createdBy',
+                select: 'name email role city state institution',
+                match: { deleted: false }
+            });
+
+        if (!form) {
+            return res.status(404).json({ error: "Formulário não encontrado" });
+        }
+
+        // Filter questions to remove those with null questionId
+        const filteredQuestions = form.questions.filter(q => q.questionId !== null);
+
+        // Filter assignedUsers to remove null and handle anonymity
+        const filteredAssignedUsers = form.assignedUsers
+            .filter(u => u !== null)
+            .map(u => {
+                // If anonymous, return only _id and anonymous
+                if (u.anonymous === true) {
+                    return { _id: u._id };
+                }
+                // If not anonymous, remove the anonymous field
+                const userObj = u.toObject ? u.toObject() : u;
+                delete userObj.anonymous;
+                return userObj;
+            });
+
+        // Return the form with filtered questions and assigned users
         return res.status(200).json({ 
             error: null, 
             msg: "Formulário encontrado com sucesso", 
@@ -614,7 +856,7 @@ router.get("/:formId", verifyToken, async (req, res) => {
  *       500:
  *         description: Erro interno do servidor
  */
-// Delete a Form by ID
+// Delete a Form by ID (ADMIN)
 router.delete("/:formId", verifyToken, async (req, res) => {
     const formId = req.params.formId;
 

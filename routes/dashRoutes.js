@@ -122,7 +122,7 @@ const getUserByToken = require('../helpers/get-user-by-token');
  *               msg: "Erro ao buscar dados!"
  *               error: "Mensagem de erro detalhada"
  */
-// Question Analysis from FormId and QuestionId
+// Question Analysis from FormId and QuestionId (ADMIN e ANALYST)
 router.get("/analysis/:formId/:questionId", verifyToken, async (req, res) => {
 
     // Token data
@@ -162,7 +162,7 @@ router.get("/analysis/:formId/:questionId", verifyToken, async (req, res) => {
         // Get responses
         const responses = await Response.find({ formId, deleted: false });
 
-        // Filtra as respostas para remover answers com questionId null
+        // Filter the answers to remove answers with questionId null
         const filteredResponses = responses.map(response => {
             const filteredAnswers = response.answers.filter(a => a.questionId && a.questionId.toString() === questionId);
             return {
@@ -353,7 +353,7 @@ router.get("/analysis/:formId/:questionId", verifyToken, async (req, res) => {
  *                 error:
  *                   type: string
  */
-// Full Analysis from FormId
+// Full Analysis from FormId (ADMIN E ANALYST)
 router.get("/full-analysis/:formId", verifyToken, async (req, res) => {
 
     // Token data
@@ -395,7 +395,7 @@ router.get("/full-analysis/:formId", verifyToken, async (req, res) => {
                 match: { deleted: false }
             });
 
-        // Filtra respostas de usuários deletados
+        // Filter responses from deleted users
         const filteredResponses = responses
             .filter(r => r.userId !== null)
             .map(response => {
@@ -406,7 +406,7 @@ router.get("/full-analysis/:formId", verifyToken, async (req, res) => {
                 };
             });
 
-        // Filtra as questões do formulário para remover as que foram soft deleted
+        // Filter questions from the form to remove those that were soft deleted
         const validQuestions = form.questions.filter(q => q.questionId !== null);
 
         const totalResponses = filteredResponses.length;
@@ -567,8 +567,8 @@ router.get("/full-analysis/:formId", verifyToken, async (req, res) => {
  *                 error:
  *                   type: string
  */
-// Export Data from FormId
-router.get("/export/:formId", verifyToken, async (req, res) => {
+// Export Data from FormId (ADMIN)
+router.get("/admins/export/:formId", verifyToken, async (req, res) => {
     
     // Token data
     const token = req.header("auth-token");
@@ -587,7 +587,7 @@ router.get("/export/:formId", verifyToken, async (req, res) => {
         }
 
         const role = user.role;
-        if (role !== 'admin' && role !== 'teacher_analyst') {
+        if (role !== 'admin') {
             return res.status(403).json({ error: "Acesso negado." });
         }
 
@@ -609,12 +609,12 @@ router.get("/export/:formId", verifyToken, async (req, res) => {
                 match: { deleted: false }
             });
 
-        // Após buscar o form:
+        // After fetching the form:
         const validQuestions = form.questions.filter(q => q.questionId !== null);
 
         // Prepare data
         const exportData = responses
-            .filter(response => response.userId) // Ignora respostas de usuários deletados
+            .filter(response => response.userId) // Filter responses from deleted users
             .map(response => {
                 const data = {
                     respondent: response.userId.name,
@@ -623,7 +623,178 @@ router.get("/export/:formId", verifyToken, async (req, res) => {
                 };
 
                 response.answers
-                    .filter(answer => answer.questionId !== null) // só answers válidas
+                    .filter(answer => answer.questionId !== null) // only valid answers
+                    .forEach(answer => {
+                        const question = validQuestions.find(q => 
+                            q.questionId._id.toString() === answer.questionId.toString()
+                        );
+                        if (question) {
+                            data[question.questionId.title] = Array.isArray(answer.answer) 
+                                ? answer.answer.join(', ') 
+                                : answer.answer;
+                        }
+                    });
+
+                return data;
+            });
+
+        return res.status(200).json({
+            formTitle: form.title,
+            totalResponses: responses.length,
+            data: exportData
+        });
+
+    } catch (error) {
+        return res.status(500).json({ msg: "Erro ao exportar dados!", error: error.message });
+    }
+});
+
+/**
+ * @swagger
+ * /api/dashboards/export/{formId}:
+ *   get:
+ *     summary: Exportar dados do formulário
+ *     description: Retorna dados em formato tabular para exportação (CSV/Excel) - apenas admin e teacher_analyst
+ *     tags: [Dashboards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: formId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do formulário
+ *         example: "507f1f77bcf86cd799439013"
+ *     responses:
+ *       200:
+ *         description: Dados exportados com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 formTitle:
+ *                   type: string
+ *                   example: "Pesquisa de Satisfação"
+ *                 totalResponses:
+ *                   type: number
+ *                   example: 150
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     additionalProperties: true
+ *                   example:
+ *                     - respondent: "João Silva"
+ *                       email: "joao@email.com"
+ *                       submittedAt: "2025-11-16T10:30:00.000Z"
+ *                       "Qual o seu nome?": "João Silva"
+ *                       "Nível de satisfação": "10"
+ *                     - respondent: "Maria Santos"
+ *                       email: "maria@email.com"
+ *                       submittedAt: "2025-11-16T11:00:00.000Z"
+ *                       "Qual o seu nome?": "Maria Santos"
+ *                       "Nível de satisfação": "8"
+ *       403:
+ *         description: Acesso negado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Formulário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro ao exportar dados
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 msg:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+// Export Data from FormId (ANALYST)
+router.get("/analysts/export/:formId", verifyToken, async (req, res) => {
+    
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    // Request params
+    const formId = req.params.formId;
+
+    try {
+
+        // Verify user
+        const user = await User.findOne({ _id: userId, deleted: false });
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado." });
+        }
+
+        const role = user.role;
+        if (role !== 'teacher_analyst') {
+            return res.status(403).json({ error: "Acesso negado." });
+        }
+
+        // Verify form
+        const form = await Form.findOne({ _id: formId, deleted: false })
+            .populate({
+                path: 'questions.questionId',
+                match: { deleted: false }
+            });
+        if (!form) {
+            return res.status(404).json({ error: "Formulário não encontrado." });
+        }
+
+        // Get responses
+        const responses = await Response.find({ formId, deleted: false })
+            .populate({
+                path: 'userId',
+                select: 'name email city state institution anonymous',
+                match: { deleted: false }
+            });
+
+        // After fetching the form:
+        const validQuestions = form.questions.filter(q => q.questionId !== null);
+
+        // Prepare data
+        const exportData = responses
+            .filter(response => response.userId) // Filter responses from deleted users
+            .map(response => {
+                let respondent, email, city, state, institution;
+                if (response.userId.anonymous === true) {
+                    respondent = "Anônimo";
+                    email = "N/A";
+                    city = "N/A";
+                    state = "N/A";
+                    institution = "N/A";
+                } else {
+                    respondent = response.userId.name;
+                    email = response.userId.email;
+                    city = response.userId.city;
+                    state = response.userId.state;
+                    institution = response.userId.institution;
+                }
+
+                const data = {
+                    respondent,
+                    email,
+                    city,
+                    state,
+                    institution,
+                    submittedAt: response.submittedAt
+                };
+
+                response.answers
+                    .filter(answer => answer.questionId !== null) // only valid answers
                     .forEach(answer => {
                         const question = validQuestions.find(q => 
                             q.questionId._id.toString() === answer.questionId.toString()
@@ -743,8 +914,8 @@ router.get("/export/:formId", verifyToken, async (req, res) => {
  *                 error:
  *                   type: string
  */
-// All Raw Responses from FormId
-router.get("/:formId", verifyToken, async (req, res) => {
+// All Raw Responses from FormId (ADMIN)
+router.get("/admins/:formId", verifyToken, async (req, res) => {
     
     // Token data
     const token = req.header("auth-token");
@@ -763,7 +934,7 @@ router.get("/:formId", verifyToken, async (req, res) => {
         }
 
         const role = user.role;
-        if (role !== 'admin' && role !== 'teacher_analyst') {
+        if (role !== 'admin') {
             return res.status(403).json({ error: "Acesso negado." });
         }
 
@@ -787,13 +958,185 @@ router.get("/:formId", verifyToken, async (req, res) => {
                 match: { deleted: false }
             });
 
-        // Filtra respostas cujo userId ficou null (usuário deletado)
+        // Filter responses whose userId became null (deleted user)
         const filteredResponses = responses
             .filter(response => response.userId !== null)
             .map(response => {
                 const filteredAnswers = response.answers.filter(a => a.questionId !== null);
                 return {
                     ...response.toObject(),
+                    answers: filteredAnswers
+                };
+            });
+
+        return res.status(200).json({ 
+            error: null, 
+            message: "Dados obtidos com sucesso!", 
+            form: form.title,
+            totalResponses: filteredResponses.length,
+            responses: filteredResponses
+        });
+
+    } catch (error) {
+        return res.status(500).json({ msg: "Erro ao buscar dados!", error: error.message });
+    }
+
+});
+
+/**
+ * @swagger
+ * /api/dashboards/{formId}:
+ *   get:
+ *     summary: Obter todas as respostas brutas
+ *     description: Retorna todas as respostas do formulário sem processamento estatístico (apenas admin e teacher_analyst)
+ *     tags: [Dashboards]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: formId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID do formulário
+ *         example: "507f1f77bcf86cd799439013"
+ *     responses:
+ *       200:
+ *         description: Respostas retornadas com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 message:
+ *                   type: string
+ *                   example: "Dados obtidos com sucesso!"
+ *                 form:
+ *                   type: string
+ *                   example: "Pesquisa de Satisfação"
+ *                 totalResponses:
+ *                   type: number
+ *                   example: 150
+ *                 responses:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       _id:
+ *                         type: string
+ *                       formId:
+ *                         type: string
+ *                       userId:
+ *                         type: object
+ *                         properties:
+ *                           _id:
+ *                             type: string
+ *                           name:
+ *                             type: string
+ *                           email:
+ *                             type: string
+ *                       answers:
+ *                         type: array
+ *                         items:
+ *                           type: object
+ *                           properties:
+ *                             questionId:
+ *                               type: string
+ *                             answer:
+ *                               oneOf:
+ *                                 - type: string
+ *                                 - type: array
+ *                       submittedAt:
+ *                         type: string
+ *                         format: date-time
+ *       403:
+ *         description: Acesso negado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       404:
+ *         description: Formulário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *       500:
+ *         description: Erro ao buscar dados
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 msg:
+ *                   type: string
+ *                 error:
+ *                   type: string
+ */
+// All Raw Responses from FormId (ANALYST)
+router.get("/analysts/:formId", verifyToken, async (req, res) => {
+    
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    // Request params
+    const formId = req.params.formId;
+
+    // Verify user
+    try {
+
+        const user = await User.findOne({ _id: userId, deleted: false });
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado." });
+        }
+
+        const role = user.role;
+        if (role !== 'teacher_analyst') {
+            return res.status(403).json({ error: "Acesso negado. Apenas analistas podem acessar esta rota." });
+        }
+
+        // Verify form
+        const form = await Form.findOne({ _id: formId, deleted: false });
+        if (!form) {
+            return res.status(404).json({ error: "Formulário não encontrado." });
+        }
+
+        // Get responses
+        const totalResponses = await Response.countDocuments({ formId, deleted: false });
+        const responses = await Response.find({ formId, deleted: false })
+            .populate({
+                path: 'userId',
+                select: 'name email city state institution anonymous',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'answers.questionId',
+                select: 'title type options',
+                match: { deleted: false }
+            });
+
+        // Filter responses whose userId became null (deleted user)
+        const filteredResponses = responses
+            .filter(response => response.userId !== null)
+            .map(response => {
+                const responseObj = response.toObject();
+                const filteredAnswers = responseObj.answers.filter(a => a.questionId !== null);
+
+                // Anonymity handling
+                if (responseObj.userId.anonymous === true) {
+                    responseObj.userId = { _id: responseObj.userId._id };
+                } else {
+                    delete responseObj.userId.anonymous;
+                }
+
+                return {
+                    ...responseObj,
                     answers: filteredAnswers
                 };
             });

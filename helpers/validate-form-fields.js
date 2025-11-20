@@ -11,7 +11,7 @@ const validateFormUpdate = (updateData, currentForm) => {
     const { title, questions, assignedUsers, isActive } = updateData;
 
     // ===================================
-    // 1. TITLE VALIDATION (se fornecido)
+    // 1. TITLE VALIDATION 
     // ===================================
     if (title !== undefined) {
         if (!title || title.trim().length === 0) {
@@ -37,7 +37,7 @@ const validateFormUpdate = (updateData, currentForm) => {
     }
 
     // ===================================
-    // 2. QUESTIONS VALIDATION (se fornecido)
+    // 2. QUESTIONS VALIDATION 
     // ===================================
     if (questions !== undefined) {
         if (!Array.isArray(questions) || questions.length === 0) {
@@ -47,7 +47,7 @@ const validateFormUpdate = (updateData, currentForm) => {
             };
         }
 
-        // Validar cada questão
+        // Validate each question
         for (let i = 0; i < questions.length; i++) {
             const question = questions[i];
 
@@ -92,9 +92,9 @@ const validateFormUpdate = (updateData, currentForm) => {
             };
         }
 
-        // Permite array vazio - remove a validação de length === 0
+        // Allows empty array - removes the length === 0 validation
 
-        // Validar cada ID de usuário (se houver)
+        // Validate each user ID (if any)
         if (assignedUsers.length > 0) {
             for (let i = 0; i < assignedUsers.length; i++) {
                 const userId = assignedUsers[i];
@@ -114,7 +114,7 @@ const validateFormUpdate = (updateData, currentForm) => {
                 }
             }
 
-            // Verificar duplicatas
+            // Check for duplicates
             const uniqueUsers = [...new Set(assignedUsers.map(id => id.toString()))];
             if (uniqueUsers.length !== assignedUsers.length) {
                 return { 
@@ -126,7 +126,7 @@ const validateFormUpdate = (updateData, currentForm) => {
     }
 
     // ===================================
-    // 4. ISACTIVE VALIDATION (se fornecido)
+    // 4. ISACTIVE VALIDATION 
     // ===================================
     if (isActive !== undefined && typeof isActive !== 'boolean') {
         return { 

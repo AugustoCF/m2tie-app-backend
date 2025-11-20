@@ -55,9 +55,16 @@ const getUserByToken = require('../helpers/get-user-by-token');
  *               error: "Usuário não encontrado"
  *       500:
  *         description: Erro ao buscar usuários
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Erro ao buscar usuários"
  */
 // Get all users - ADMIN ONLY
 router.get("/all", verifyToken, async (req, res) => {
+    
     // Token data
     const token = req.header("auth-token");
     const userByToken = await getUserByToken(token);
@@ -85,6 +92,77 @@ router.get("/all", verifyToken, async (req, res) => {
     }
 });
 
+/**
+ * @swagger
+ * /api/users/assignable:
+ *   get:
+ *     summary: Listar usuários atribuíveis a formulários
+ *     description: Retorna apenas estudantes e professores que podem responder formulários (apenas admin)
+ *     tags: [Usuários]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Usuários encontrados com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Usuários encontrados com sucesso"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/User'
+ *             example:
+ *               error: null
+ *               msg: "Usuários encontrados com sucesso"
+ *               data:
+ *                 - _id: "507f1f77bcf86cd799439011"
+ *                   name: "Maria Santos"
+ *                   email: "maria@email.com"
+ *                   role: "student"
+ *                   city: "Rio de Janeiro"
+ *                   state: "RJ"
+ *                   institution: "Escola ABC"
+ *                 - _id: "507f1f77bcf86cd799439012"
+ *                   name: "Pedro Oliveira"
+ *                   email: "pedro@email.com"
+ *                   role: "teacher_respondent"
+ *                   city: "Belo Horizonte"
+ *                   state: "MG"
+ *                   institution: "Colégio XYZ"
+ *       401:
+ *         description: Acesso negado - apenas admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Acesso negado"
+ *       404:
+ *         description: Usuário autenticado não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Usuário não encontrado"
+ *       500:
+ *         description: Erro ao buscar usuários
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Erro ao buscar usuários"
+ */
 // Get all students and teacher respondents - for form assignment - ADMIN ONLY 
 router.get("/assignable", verifyToken, async (req, res) => {
 
@@ -130,6 +208,7 @@ router.get("/assignable", verifyToken, async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
+ *           format: objectId
  *         description: ID do usuário
  *         example: "507f1f77bcf86cd799439011"
  *     responses:
@@ -191,7 +270,11 @@ router.get("/:id", verifyToken, async (req, res) => {
  * /api/users/{id}:
  *   put:
  *     summary: Atualizar usuário
- *     description: Atualiza dados de um usuário. Usuários podem editar seus próprios dados, admin pode editar qualquer usuário e alterar roles.
+ *     description: |
+ *       Atualiza dados de um usuário. 
+ *       - Usuários podem editar seus próprios dados (exceto role)
+ *       - Admin pode editar qualquer usuário e alterar roles
+ *       - Todos os campos são opcionais
  *     tags: [Usuários]
  *     security:
  *       - bearerAuth: []
@@ -201,6 +284,7 @@ router.get("/:id", verifyToken, async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
+ *           format: objectId
  *         description: ID do usuário a ser atualizado
  *         example: "507f1f77bcf86cd799439011"
  *     requestBody:
@@ -213,6 +297,10 @@ router.get("/:id", verifyToken, async (req, res) => {
  *               name:
  *                 type: string
  *                 example: "João Silva Atualizado"
+ *               anonymous:
+ *                 type: boolean
+ *                 example: true
+ *                 description: "Se o usuário deseja permanecer anônimo"
  *               email:
  *                 type: string
  *                 format: email
@@ -220,21 +308,36 @@ router.get("/:id", verifyToken, async (req, res) => {
  *               password:
  *                 type: string
  *                 format: password
+ *                 minLength: 6
  *                 example: "novaSenha123"
  *               confirmPassword:
  *                 type: string
  *                 format: password
  *                 example: "novaSenha123"
+ *                 description: "Deve ser igual ao campo password"
  *               role:
  *                 type: string
- *                 enum: ['admin', 'student', 'teacher_analyst', 'teacher_respondent']
+ *                 enum: [admin, student, teacher_analyst, teacher_respondent]
  *                 example: "teacher_analyst"
  *                 description: "Apenas admin pode alterar role"
+ *               city:
+ *                 type: string
+ *                 example: "São Paulo"
+ *               state:
+ *                 type: string
+ *                 example: "SP"
+ *               institution:
+ *                 type: string
+ *                 example: "Universidade Federal"
  *           examples:
  *             atualizarNome:
  *               summary: Atualizar apenas nome
  *               value:
  *                 name: "João Silva Atualizado"
+ *             atualizarAnonimato:
+ *               summary: Tornar usuário anônimo
+ *               value:
+ *                 anonymous: true
  *             atualizarSenha:
  *               summary: Atualizar senha
  *               value:
@@ -244,14 +347,24 @@ router.get("/:id", verifyToken, async (req, res) => {
  *               summary: Atualizar role (apenas admin)
  *               value:
  *                 role: "teacher_analyst"
+ *             atualizarLocalizacao:
+ *               summary: Atualizar localização
+ *               value:
+ *                 city: "Rio de Janeiro"
+ *                 state: "RJ"
+ *                 institution: "UFRJ"
  *             atualizarCompleto:
  *               summary: Atualização completa
  *               value:
  *                 name: "João Silva"
+ *                 anonymous: false
  *                 email: "joao.novo@email.com"
  *                 password: "novaSenha123"
  *                 confirmPassword: "novaSenha123"
  *                 role: "teacher_analyst"
+ *                 city: "São Paulo"
+ *                 state: "SP"
+ *                 institution: "USP"
  *     responses:
  *       200:
  *         description: Usuário atualizado com sucesso
@@ -304,8 +417,16 @@ router.get("/:id", verifyToken, async (req, res) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Usuário não encontrado"
  *       500:
  *         description: Erro ao atualizar usuário
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Erro ao atualizar usuário"
  */
 // Update an user
 router.put("/:id", verifyToken, async (req, res) => {
@@ -434,7 +555,7 @@ router.put("/:id", verifyToken, async (req, res) => {
  * /api/users/{id}:
  *   delete:
  *     summary: Deletar usuário
- *     description: Remove um usuário do sistema (apenas admin)
+ *     description: Remove um usuário do sistema através de soft delete (apenas admin)
  *     tags: [Usuários]
  *     security:
  *       - bearerAuth: []
@@ -444,6 +565,7 @@ router.put("/:id", verifyToken, async (req, res) => {
  *         required: true
  *         schema:
  *           type: string
+ *           format: objectId
  *         description: ID do usuário a ser deletado
  *         example: "507f1f77bcf86cd799439011"
  *     responses:
@@ -479,6 +601,12 @@ router.put("/:id", verifyToken, async (req, res) => {
  *               error: "Usuário não encontrado"
  *       500:
  *         description: Erro ao deletar usuário
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Erro ao deletar usuário"
  */
 // Delete an user by ID - ADMIN ONLY
 router.delete("/:id", verifyToken, async (req, res) => {

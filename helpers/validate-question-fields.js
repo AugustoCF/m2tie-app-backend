@@ -180,7 +180,7 @@ const validateQuestionUpdate = (updateData, currentQuestion) => {
     const { title, type, options, validation } = updateData;
 
     // ===================================
-    // 1. TITLE VALIDATION (se fornecido)
+    // 1. TITLE VALIDATION 
     // ===================================
     if (title !== undefined) {
         if (!title || title.trim().length === 0) {
@@ -206,7 +206,7 @@ const validateQuestionUpdate = (updateData, currentQuestion) => {
     }
 
     // ===================================
-    // 2. TYPE VALIDATION (se fornecido)
+    // 2. TYPE VALIDATION 
     // ===================================
     if (type !== undefined) {
         const validTypes = ['text', 'multiple_choice', 'checkbox', 'dropdown', 'scale', 'date'];
@@ -219,15 +219,15 @@ const validateQuestionUpdate = (updateData, currentQuestion) => {
         }
     }
 
-    // Usar type do update ou type atual
+    // Use type from update or current
     const finalType = type !== undefined ? type : currentQuestion.type;
 
     // ===================================
-    // 3. OPTIONS VALIDATION (se fornecido)
+    // 3. OPTIONS VALIDATION 
     // ===================================
     const typesNeedingOptions = ['multiple_choice', 'checkbox', 'dropdown', 'scale'];
 
-    // Se mudou o type para um que precisa de options
+    // If changed the type to one that needs options
     if (type !== undefined && typesNeedingOptions.includes(type)) {
         const finalOptions = options !== undefined ? options : currentQuestion.options;
 
@@ -246,7 +246,7 @@ const validateQuestionUpdate = (updateData, currentQuestion) => {
         }
     }
 
-    // Se está atualizando options
+    // If updating options
     if (options !== undefined) {
         if (typesNeedingOptions.includes(finalType)) {
             if (!Array.isArray(options) || options.length === 0) {
@@ -310,7 +310,7 @@ const validateQuestionUpdate = (updateData, currentQuestion) => {
     }
 
     // ===================================
-    // 4. VALIDATION OBJECT VALIDATION (se fornecido)
+    // 4. VALIDATION OBJECT VALIDATION 
     // ===================================
     if (validation !== undefined) {
         if (finalType !== 'text') {

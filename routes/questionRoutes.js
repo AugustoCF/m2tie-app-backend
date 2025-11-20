@@ -394,7 +394,7 @@ router.get("/:id", verifyToken, async (req, res) => {
  *       500:
  *         description: Erro interno do servidor
  */
-// Delete Question
+// Delete Question (ADMIN)
 router.delete("/:id", verifyToken, async (req, res) => {
     
     const token = req.header("auth-token");

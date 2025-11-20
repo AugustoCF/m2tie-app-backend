@@ -321,8 +321,8 @@ router.post("/", verifyToken, async (req, res) => {
  *       500:
  *         description: Erro interno do servidor
  */
-// Get all responses (admin/teacher_analyst only)
-router.get("/all", verifyToken, async (req, res) => {
+// Get all responses (ADMIN)
+router.get("/admins/all", verifyToken, async (req, res) => {
 
     // Token data
     const token = req.header("auth-token");
@@ -340,7 +340,7 @@ router.get("/all", verifyToken, async (req, res) => {
         const role = user.role;
 
         // Only 'admin' and 'teacher_analyst' can access all responses
-        if (role !== 'admin' && role !== 'teacher_analyst') {
+        if (role !== 'admin') {
             return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar todas as respostas" });
         }
 
@@ -362,16 +362,14 @@ router.get("/all", verifyToken, async (req, res) => {
                 match: { deleted: false }
             });
 
-        // Tratar respostas com usuários deletados e filtrar answers com questionId null
+        // Handle responses with deleted users and filter answers with null questionId
         const responsesWithDeletedUsers = responses
-            // Filtra respostas cujo formId ficou null (formulário deletado)
             .filter(response => response.formId !== null)
-            // Filtra respostas cujo userId ficou null (usuário deletado)
             .filter(response => response.userId !== null)
             .map(response => {
                 const responseObj = response.toObject();
 
-                // Filtrar answers para remover as que têm questionId null
+                // Filter answers to remove those with null questionId
                 responseObj.answers = responseObj.answers.filter(a => a.questionId !== null);
 
                 return responseObj;
@@ -479,8 +477,8 @@ router.get("/all", verifyToken, async (req, res) => {
  *       500:
  *         description: Erro interno do servidor
  */
-// Get respondents of a Form
-router.get("/:formId/respondents", verifyToken, async (req, res) => {
+// Get respondents of a Form (ADMIN)
+router.get("/admins/:formId/respondents", verifyToken, async (req, res) => {
 
     // Token data
     const token = req.header("auth-token");
@@ -498,9 +496,9 @@ router.get("/:formId/respondents", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
 
-        // Only admin and teacher_analyst can access
-        if (user.role !== 'admin' && user.role !== 'teacher_analyst') {
-            return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar esta informação" });
+        // Only admin can access
+        if (user.role !== 'admin') {
+            return res.status(401).json({ error: "Acesso negado, apenas administradores podem acessar esta informação" });
         }
 
         // Verify if form exists
@@ -645,7 +643,7 @@ router.get("/:formId/respondents", verifyToken, async (req, res) => {
  *         description: Erro interno do servidor
  */
 // Get response by ID (admin/teacher_analyst only)
-router.get("/:id", verifyToken, async (req, res) => {
+router.get("/admins/:id", verifyToken, async (req, res) => {
 
     // Token data
     const token = req.header("auth-token");
@@ -663,9 +661,9 @@ router.get("/:id", verifyToken, async (req, res) => {
         }
         const role = user.role;
 
-        // Only 'admin' and 'teacher_analyst' can access response by ID
-        if (role !== 'admin' && role !== 'teacher_analyst') {
-            return res.status(401).json({ error: "Acesso negado, apenas administradores e equipe podem acessar respostas específicas" });
+        // Only 'admin' can access response by ID
+        if (role !== 'admin') {
+            return res.status(401).json({ error: "Acesso negado, apenas administradores podem acessar respostas específicas" });
         }
 
         // Find response by ID
@@ -690,7 +688,7 @@ router.get("/:id", verifyToken, async (req, res) => {
             return res.status(404).json({ error: "Resposta não encontrada" });
         }
 
-        // Tratar caso o usuário tenha sido deletado
+        // Handle case where the user has been deleted
         const responseObj = response.toObject();
         
         if (!responseObj.userId) {
@@ -700,7 +698,7 @@ router.get("/:id", verifyToken, async (req, res) => {
             };
         }
 
-        // Filtrar answers para remover as que têm questionId null
+        // Filter answers to remove those with null questionId
         responseObj.answers = responseObj.answers.filter(a => a.questionId !== null);
 
         return res.status(200).json({ 
@@ -713,6 +711,335 @@ router.get("/:id", verifyToken, async (req, res) => {
         return res.status(500).json({ error });
     }
 });
+
+// Get All responses (ANALYSTS)
+router.get("/analysts/all", verifyToken, async (req, res) => {
+
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    try {
+
+        const user = await User.findOne({ _id: userId, deleted: false });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        const role = user.role;
+
+        // Only 'teacher_analyst' can access all responses
+        if (role !== 'teacher_analyst') {
+            return res.status(401).json({ error: "Acesso negado, apenas analistas podem acessar essas respostas" });
+        }
+
+        const responses = await Response.find({ deleted: false })
+            .sort({ submittedAt: -1 })
+            .populate({
+                path: 'formId',
+                select: 'title description',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'userId',
+                select: '_id name email city state institution anonymous',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'answers.questionId',
+                select: 'title type options',
+                match: { deleted: false }
+            });
+
+        // Handle responses with deleted users and filter answers with null questionId
+        const responsesWithDeletedUsers = responses
+            .filter(response => response.formId !== null)
+            .filter(response => response.userId !== null)
+            .map(response => {
+                const responseObj = response.toObject();
+
+                // If anonymous, return only _id in userId
+                if (responseObj.userId.anonymous === true) {
+                    responseObj.userId = { _id: responseObj.userId._id };
+                }
+
+                // Filter answers to remove those with null questionId
+                responseObj.answers = responseObj.answers.filter(a => a.questionId !== null);
+
+                return responseObj;
+            });
+
+        return res.status(200).json({ 
+            error: null, 
+            msg: "Respostas encontradas com sucesso", 
+            data: responsesWithDeletedUsers 
+        });
+
+    } catch (error) {
+        return res.status(500).json({ error });
+    }
+
+});
+
+// Get respondents of a Form (ANALYSTS)
+router.get("/analysts/:formId/respondents", verifyToken, async (req, res) => {
+
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    // Request data
+    const formId = req.params.formId;
+
+    try {
+
+        // Verify user
+        const user = await User.findOne({ _id: userId, deleted: false });
+
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+
+        // Only analysts can access
+        if (user.role !== 'teacher_analyst') {
+            return res.status(401).json({ error: "Acesso negado, apenas analistas podem acessar esta informação" });
+        }
+
+        // Verify if form exists
+        const form = await Form.findOne({ _id: formId, deleted: false });
+
+        if (!form) {
+            return res.status(404).json({ error: "Formulário não encontrado" });
+        }
+
+        // Get all responses for this form
+        const responses = await Response.find({ formId: formId, deleted: false })
+            .populate({
+                path: 'userId',
+                select: '_id name email city state institution anonymous',
+                match: { deleted: false }
+            })
+            .sort({ submittedAt: -1 });
+
+        // Extract users with response details
+        const respondents = responses.map(response => {
+            if (response.userId) {
+                // Se for anônimo, só retorna o _id
+                if (response.userId.anonymous === true) {
+                    return {
+                        _id: response.userId._id,
+                        submittedAt: response.submittedAt,
+                        responseId: response._id
+                    };
+                }
+                // If not anonymous, return all data
+                return {
+                    _id: response.userId._id,
+                    name: response.userId.name,
+                    email: response.userId.email,
+                    role: response.userId.role,
+                    city: response.userId.city,
+                    state: response.userId.state,
+                    institution: response.userId.institution,
+                    submittedAt: response.submittedAt,
+                    responseId: response._id
+                };
+            } else {
+                // Handle deleted users
+                return {
+                    _id: null,
+                    name: "Usuário Deletado",
+                    email: "N/A",
+                    role: "N/A",
+                    city: "N/A",
+                    state: "N/A",
+                    institution: "N/A",
+                    submittedAt: response.submittedAt,
+                    responseId: response._id
+                };
+            }
+        });
+
+        return res.status(200).json({
+            error: null,
+            msg: "Respondentes encontrados com sucesso",
+            formTitle: form.title,
+            formDescription: form.description,
+            totalRespondents: respondents.length,
+            respondents: respondents
+        });
+
+    } catch (error) {
+        return res.status(500).json({ error: "Erro ao buscar respondentes" });
+    }
+});
+
+/**
+ * @swagger
+ * /api/responses/{id}:
+ *   get:
+ *     summary: Obter resposta por ID
+ *     description: Retorna uma resposta específica com todos os detalhes (apenas admin e teacher_analyst)
+ *     tags: [Respostas]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: ID da resposta
+ *         example: "507f1f77bcf86cd799439015"
+ *     responses:
+ *       200:
+ *         description: Resposta encontrada com sucesso
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *                   nullable: true
+ *                   example: null
+ *                 msg:
+ *                   type: string
+ *                   example: "Resposta encontrada com sucesso"
+ *                 data:
+ *                   allOf:
+ *                     - $ref: '#/components/schemas/Response'
+ *                     - type: object
+ *                       properties:
+ *                         formId:
+ *                           type: object
+ *                           properties:
+ *                             title:
+ *                               type: string
+ *                               example: "Pesquisa de Satisfação"
+ *                             description:
+ *                               type: string
+ *                         userId:
+ *                           oneOf:
+ *                             - type: object
+ *                               properties:
+ *                                 name:
+ *                                   type: string
+ *                                   example: "João Silva"
+ *                                 email:
+ *                                   type: string
+ *                                   example: "joao@email.com"
+ *                             - type: object
+ *                               properties:
+ *                                 name:
+ *                                   type: string
+ *                                   example: "Usuário Deletado"
+ *                                 email:
+ *                                   type: string
+ *                                   example: "N/A"
+ *       401:
+ *         description: Acesso negado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             example:
+ *               error: "Acesso negado, apenas administradores e equipe podem acessar respostas específicas"
+ *       404:
+ *         description: Resposta ou usuário não encontrado
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ *             examples:
+ *               usuarioNaoEncontrado:
+ *                 value:
+ *                   error: "Usuário não encontrado"
+ *               respostaNaoEncontrada:
+ *                 value:
+ *                   error: "Resposta não encontrada"
+ *       500:
+ *         description: Erro interno do servidor
+ */
+// Get response by ID (ANALYSTS)
+router.get("/analysts/:id", verifyToken, async (req, res) => {
+
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    // Request data
+    const responseId = req.params.id;
+
+    // Check user in Db
+    try {
+        const user = await User.findOne({ _id: userId, deleted: false });
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+        const role = user.role;
+
+        // Only 'teacher_analyst' can access response by ID
+        if (role !== 'teacher_analyst') {
+            return res.status(401).json({ error: "Acesso negado, apenas analistas podem acessar essa resposta específica" });
+        }
+
+        // Find response by ID
+        const response = await Response.findOne({ _id: responseId, deleted: false })
+            .populate({
+                path: 'formId',
+                select: 'title description',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'userId',
+                select: '_id name email city state institution anonymous',
+                match: { deleted: false }
+            })
+            .populate({
+                path: 'answers.questionId',
+                select: 'title type options',
+                match: { deleted: false }
+            });
+
+        if (!response) {
+            return res.status(404).json({ error: "Resposta não encontrada" });
+        }
+
+        // Handle case where the user has been deleted
+        const responseObj = response.toObject();
+
+        if (!responseObj.userId) {
+            responseObj.userId = {
+                name: "Usuário Deletado",
+                email: "N/A"
+            };
+        } else if (responseObj.userId.anonymous === true) {
+            // If anonymous, return only _id in userId
+            responseObj.userId = { _id: responseObj.userId._id };
+        } else {
+            // If not anonymous, remove the anonymous field
+            delete responseObj.userId.anonymous;
+        }
+
+        // Filter answers to remove those with null questionId
+        responseObj.answers = responseObj.answers.filter(a => a.questionId !== null);
+
+        return res.status(200).json({ 
+            error: null, 
+            msg: "Resposta encontrada com sucesso", 
+            data: responseObj 
+        });
+
+    } catch (error) {
+        return res.status(500).json({ error });
+    }
+});
+
 
 /**
  * @swagger
@@ -770,7 +1097,7 @@ router.get("/:id", verifyToken, async (req, res) => {
  *       500:
  *         description: Erro interno do servidor
  */
-// Delete a response by ID (admin only)
+// Delete a response by ID (ADMIN)
 router.delete("/:id", verifyToken, async (req, res) => {
 
     // Token data
