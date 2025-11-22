@@ -56,11 +56,18 @@ http://localhost:8000/api/docs
 
 ## 🛠️ Tecnologias
 
-- **Node.js** + **Express.js** - Backend framework
-- **MongoDB** + **Mongoose** - Banco de dados
-- **JWT** - Autenticação
-- **Bcrypt** - Criptografia de senhas
-- **Swagger** - Documentação da API
+| Tecnologia | Versão | Propósito |
+|------------|--------|-----------|
+| **Node.js** | 24.11.1 | Runtime JavaScript |
+| **Express.js** | 5.1.0 | Framework web |
+| **MongoDB** | - | Banco de dados NoSQL |
+| **Mongoose** | 8.19.3 | ODM para MongoDB |
+| **JWT** | 9.0.2 | Autenticação e autorização |
+| **Bcrypt** | 6.0.0 | Criptografia de senhas |
+| **Nodemailer** | 7.0.10 | Envio de emails |
+| **Swagger** | 6.2.8 / 5.0.1 | Documentação da API |
+| **CORS** | 2.8.5 | Controle de acesso |
+| **Nodemon** | 3.1.10 | Auto-reload em desenvolvimento |
 
 ---
 

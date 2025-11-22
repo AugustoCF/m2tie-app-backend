@@ -25,6 +25,14 @@ const responseSchema = new mongoose.Schema({
     submittedAt: {
         type: Date,
         default: Date.now
+    },
+    isDraft: {
+        type: Boolean,
+        default: false
+    },
+    lastModified: {
+        type: Date,
+        default: Date.now
     }
 });
 

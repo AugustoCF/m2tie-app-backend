@@ -229,7 +229,6 @@ router.post("/", verifyToken, async (req, res) => {
 
 });
 
-
 /**
  * @swagger
  * /api/forms/active:
