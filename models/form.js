@@ -6,6 +6,11 @@ const formSchema = new mongoose.Schema({
         required: true
     },
     description: String,
+    type: {
+        type: String,
+        enum: ['form', 'diary'],
+        default: 'form'
+    },
     questions: [{
         questionId: {
             type: mongoose.Schema.Types.ObjectId,

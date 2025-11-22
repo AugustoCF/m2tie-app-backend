@@ -112,6 +112,7 @@ router.post("/", verifyToken, async (req, res) => {
     const questions = req.body.questions;
     const assignedUsers = req.body.assignedUsers;
     const isActive = req.body.isActive;
+    const type = req.body.type || 'form';
 
     // Verify Admin user
     try {
@@ -166,12 +167,26 @@ router.post("/", verifyToken, async (req, res) => {
             }
         }
 
+        // Diary type validation
+        if (type === 'diary') {
+            if (questions.length !== 1) {
+                return res.status(400).json({ error: "Um diário deve conter exatamente uma questão" });
+            }
+            
+            // Check if the question is of type text
+            const question = await Question.findById(questions[0].questionId);
+            if (question.type !== 'text') {
+                return res.status(400).json({ error: "A questão do diário deve ser do tipo texto" });
+            }
+        }
+
         const formIsActive = isActive !== undefined ? isActive : true;
 
         // Create form object
         const form = new Form({
             title: title.trim(),
             description: description?.trim() || '',
+            type: type,
             questions: questions.map((q, index) => ({
                 questionId: q.questionId,
                 order: q.order !== undefined ? q.order : index,
@@ -327,20 +342,45 @@ router.get("/active", verifyToken, async (req, res) => {
 
         // For each form, check if the user has already responded
         const formsWithStatus = await Promise.all(forms.map(async form => {
-            const response = await Response.findOne({
-                formId: form._id,
-                userId: userId,
-                deleted: false
-            });
+            let response;
+            let hasResponded;
+            
+            // If diary, check for today's response
+            if (form.type === 'diary') {
+                const today = new Date();
+                today.setHours(0, 0, 0, 0);
+                const todayEnd = new Date(today);
+                todayEnd.setHours(23, 59, 59, 999);
+                
+                response = await Response.findOne({
+                    formId: form._id,
+                    userId: userId,
+                    deleted: false,
+                    submittedAt: {
+                        $gte: today,
+                        $lte: todayEnd
+                    }
+                });
+                hasResponded = !!response;
+            } else {
+                // For normal forms, check if already responded at any time
+                response = await Response.findOne({
+                    formId: form._id,
+                    userId: userId,
+                    deleted: false
+                });
+                hasResponded = !!response;
+            }
 
             const filteredQuestions = form.questions.filter(q => q.questionId !== null);
 
             return {
                 ...form.toObject(),
                 questions: filteredQuestions,
-                hasResponded: !!response,
+                hasResponded: hasResponded,
                 responseId: response?._id,
-                submittedAt: response?.createdAt
+                submittedAt: response?.submittedAt,
+                isDiary: form.type === 'diary'
             };
         }));
 
@@ -1003,7 +1043,7 @@ router.put("/:formId", verifyToken, async (req, res) => {
     const userByToken = await getUserByToken(token);
     const userId = userByToken._id.toString();
 
-    const { title, description, questions, assignedUsers, isActive } = req.body;
+    const { title, description, type, questions, assignedUsers, isActive } = req.body;
 
     try {
 
@@ -1064,6 +1104,13 @@ router.put("/:formId", verifyToken, async (req, res) => {
             }
         }
 
+        // If changing to diary or already diary
+        if ((type === 'diary' || form.type === 'diary') && questions !== undefined) {
+            if (questions.length !== 1) {
+                return res.status(400).json({ error: "Um diário deve conter exatamente uma questão" });
+            }
+        }
+
         // Build updated form object
         const updateData = {};
 
@@ -1075,6 +1122,10 @@ router.put("/:formId", verifyToken, async (req, res) => {
             updateData.description = description.trim() || '';
         }
 
+        if (type !== undefined) {
+            updateData.type = type;
+        }
+
         if (questions !== undefined) {
             updateData.questions = questions.map((q, index) => ({
                 questionId: q.questionId,
@@ -1084,7 +1135,11 @@ router.put("/:formId", verifyToken, async (req, res) => {
         }
 
         if (assignedUsers !== undefined) {
-            updateData.assignedUsers = assignedUsers;
+            const isEmptyArray = assignedUsers.length === 0;
+            
+            if (!isEmptyArray) {
+                updateData.assignedUsers = assignedUsers;
+            }
         }
 
         if (isActive !== undefined) {

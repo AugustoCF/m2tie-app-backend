@@ -146,6 +146,31 @@ router.post("/", verifyToken, async (req, res) => {
             return res.status(400).json({ error: "Este formulário não está mais ativo" });
         }
 
+        // If form is diary, check if user has already submitted today
+        if (form.type === 'diary') {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Zera as horas para comparar apenas a data
+            
+            const todayEnd = new Date(today);
+            todayEnd.setHours(23, 59, 59, 999);
+            
+            const responseToday = await Response.findOne({
+                formId: formId,
+                userId: userId,
+                deleted: false,
+                submittedAt: {
+                    $gte: today,
+                    $lte: todayEnd
+                }
+            });
+            
+            if (responseToday) {
+                return res.status(400).json({ 
+                    error: "Você já preencheu o diário hoje. Volte amanhã!" 
+                });
+            }
+        }
+
         // Validate answers format
         if (!answers || !Array.isArray(answers)) {
             return res.status(400).json({ error: "Formato de respostas inválido" });
@@ -1037,6 +1062,58 @@ router.get("/analysts/:id", verifyToken, async (req, res) => {
 
     } catch (error) {
         return res.status(500).json({ error });
+    }
+});
+
+// Get if a user can answer the diary today
+router.get("/diary/:formId/can-respond", verifyToken, async (req, res) => {
+
+    // Token data
+    const token = req.header("auth-token");
+    const userByToken = await getUserByToken(token);
+    const userId = userByToken._id.toString();
+
+    // Request data
+    const formId = req.params.formId;
+
+    try {
+        // Verify user
+        const user = await User.findOne({ _id: userId, deleted: false });
+        if (!user) {
+            return res.status(404).json({ error: "Usuário não encontrado" });
+        }
+        // Verify form
+        const form = await Form.findOne({ _id: formId, deleted: false });
+        if (!form) {
+            return res.status(404).json({ error: "Formulário não encontrado" });
+        }
+
+        // Check if form is a diary
+        if (form.type !== 'diary') {
+            return res.status(400).json({ error: "O formulário não é um diário" });
+        }
+
+        // Check if user has already submitted a response today
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(today);
+        todayEnd.setHours(23, 59, 59, 999);
+
+        const responseToday = await Response.findOne({
+            formId: formId,
+            userId: userId,
+            deleted: false,
+            submittedAt: { $gte: today, $lte: todayEnd }
+        });
+
+        return  res.status(200).json({ 
+            error: null, 
+            msg: "Verificação concluída com sucesso", 
+            canRespond: responseToday ? false : true 
+        });
+        
+    } catch (error) {
+        return res.status(500).json({ error: "Erro ao verificar se o usuário pode responder o diário hoje" });
     }
 });
 
