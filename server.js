@@ -19,6 +19,7 @@ const dashRouter = require('./routes/dashRoutes.js');
 
 // Middlewares
 
+
 // Configurations
 const port = process.env.PORT;
 const app = express();
