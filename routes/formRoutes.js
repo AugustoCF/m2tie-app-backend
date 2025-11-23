@@ -306,19 +306,17 @@ router.post("/", verifyToken, async (req, res) => {
  */
 // Get Active Form
 router.get("/active", verifyToken, async (req, res) => {
-
     // Token data
     const token = req.header("auth-token");
     const userByToken = await getUserByToken(token);
     const userId = userByToken._id.toString();
-
+    
     try {
         const user = await User.findOne({ _id: userId, deleted: false });
-
         if (!user) {
             return res.status(404).json({ error: "Usuário não encontrado" });
         }
-
+        
         const forms = await Form.find({ 
             assignedUsers: userId,
             isActive: true,
@@ -334,15 +332,20 @@ router.get("/active", verifyToken, async (req, res) => {
                 select: 'name email role city state institution',
                 match: { deleted: false }
             });
-
+        
         if (!forms || forms.length === 0) {
-            return res.status(200).json({ error: null, msg: "Nenhum formulário ativo encontrado para este usuário", data: [] });
+            return res.status(200).json({ 
+                error: null, 
+                msg: "Nenhum formulário ativo encontrado para este usuário", 
+                data: [] 
+            });
         }
-
+        
         // For each form, check if the user has already responded
         const formsWithStatus = await Promise.all(forms.map(async form => {
             let response;
             let hasResponded;
+            let hasDraft = false; 
             
             // If diary, check for today's response
             if (form.type === 'diary') {
@@ -355,40 +358,64 @@ router.get("/active", verifyToken, async (req, res) => {
                     formId: form._id,
                     userId: userId,
                     deleted: false,
+                    isDraft: false, 
                     submittedAt: {
                         $gte: today,
                         $lte: todayEnd
                     }
                 });
                 hasResponded = !!response;
+
+                const draft = await Response.findOne({
+                    formId: form._id,
+                    userId: userId,
+                    deleted: false,
+                    isDraft: true,
+                    lastModified: {
+                        $gte: today,
+                        $lte: todayEnd
+                    }
+                });
+                hasDraft = !!draft;
+
             } else {
-                // For normal forms, check if already responded at any time
+                
                 response = await Response.findOne({
                     formId: form._id,
                     userId: userId,
-                    deleted: false
+                    deleted: false,
+                    isDraft: false 
                 });
                 hasResponded = !!response;
+
+                const draft = await Response.findOne({
+                    formId: form._id,
+                    userId: userId,
+                    deleted: false,
+                    isDraft: true
+                });
+                hasDraft = !!draft;
             }
-
+            
             const filteredQuestions = form.questions.filter(q => q.questionId !== null);
-
+            
             return {
                 ...form.toObject(),
                 questions: filteredQuestions,
                 hasResponded: hasResponded,
+                hasDraft: hasDraft, // ⬅️ NOVO: Informar se tem draft
                 responseId: response?._id,
                 submittedAt: response?.submittedAt,
                 isDiary: form.type === 'diary'
             };
         }));
-
+        
         return res.status(200).json({ 
             error: null, 
             msg: "Formulários ativos encontrados com sucesso", 
             data: formsWithStatus
         });
-
+        
     } catch (error) {
         return res.status(500).json({ error: "Erro ao buscar formulários ativos" });
     }
